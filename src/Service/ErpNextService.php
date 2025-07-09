@@ -623,9 +623,26 @@ class ErpNextService
             ['start_date', '>=', "{$year}-01-01"],
             ['start_date', '<=', "{$year}-12-31"],
         ] : [];
-        return $this->listResource('Salary Slip', $filters, [
-            'name', 'start_date','gross_pay','total_deduction','net_pay'
+
+        // Récupérer une liste de fiches de paie avec les champs de base
+        $this->logger->info('ERPNextService: Fetching basic salary slips with filters', ['filters' => $filters]);
+        $basicSalarySlips = $this->listResource('Salary Slip', $filters, [
+            'name', 'start_date', 'gross_pay', 'total_deduction', 'net_pay'
         ], null, 10000);
+        $this->logger->info('ERPNextService: Basic salary slips received', ['count' => count($basicSalarySlips), 'slips_sample' => array_slice($basicSalarySlips, 0, 2)]);
+
+        $detailedSalarySlips = [];
+        foreach ($basicSalarySlips as $slip) {
+            // Pour chaque fiche de paie, récupérer les détails complets, y compris les tables enfants
+            $detailedSlip = $this->getSalarySlipDetails($slip['name']);
+            if ($detailedSlip) {
+                $detailedSalarySlips[] = $detailedSlip;
+            } else {
+                $this->logger->warning('ERPNextService: Failed to get detailed slip for', ['slip_name' => $slip['name']]);
+            }
+        }
+        $this->logger->info('ERPNextService: Detailed salary slips collected', ['count' => count($detailedSalarySlips), 'slips_sample' => array_slice($detailedSalarySlips, 0, 2)]);
+        return $detailedSalarySlips;
     }
 
     public function getSalarySlips(array $filters): array

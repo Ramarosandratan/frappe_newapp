@@ -1,12 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Salary Slip</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fiche de paie - {{ payslip.employee_name ?? 'N/A' }}</title>
     <style>
         body {
-            font-family: sans-serif;
-            font-size: 10pt;
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
         }
 
         .container {
@@ -83,16 +88,28 @@
 </head>
 <body>
     <div class="container">
-        <h1>Salary Slip</h1>
+        <h1>Fiche de paie</h1>
 
         <div class="card">
             <div class="card-header">
-                <h2>{{ payslip.employee_name }}</h2>
+                <h2>{{ payslip.employee_name ?? 'N/A' }}</h2>
             </div>
             <div class="card-body">
-                <p><strong>Employee ID:</strong> {{ payslip.employee }}</p>
-                <p><strong>Period:</strong> {{ payslip.start_date|date('d/m/Y') }} - {{ payslip.end_date|date('d/m/Y') }}</p>
-                <p><strong>Posting Date:</strong> {{ payslip.posting_date|date('d/m/Y') }}</p>
+                <p><strong>ID Employé:</strong> {{ payslip.employee ?? 'N/A' }}</p>
+                <p><strong>Période:</strong> 
+                    {% if payslip.start_date and payslip.end_date %}
+                        {{ payslip.start_date|date('d/m/Y') }} - {{ payslip.end_date|date('d/m/Y') }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
+                <p><strong>Date de publication:</strong> 
+                    {% if payslip.posting_date %}
+                        {{ payslip.posting_date|date('d/m/Y') }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </p>
             </div>
         </div>
 
@@ -100,41 +117,92 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h3>Earnings</h3>
+                        <h3>Gains</h3>
                     </div>
-                    <ul class="list-group">
-                        {% for earning in payslip.earnings %}
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span>{{ earning.salary_component }}</span>
-                                <span>{{ earning.amount|number_format(2, '.', ',') }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
+                    {% if payslip.earnings and payslip.earnings|length > 0 %}
+                        <ul class="list-group">
+                            {% for earning in payslip.earnings %}
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>{{ earning.salary_component ?? 'N/A' }}</span>
+                                    <span>
+                                        {% if earning.amount is not null %}
+                                            {{ earning.amount|number_format(2, ',', ' ') }} €
+                                        {% else %}
+                                            0,00 €
+                                        {% endif %}
+                                    </span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="card-body">
+                            <p>Aucun gain enregistré</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h3>Deductions</h3>
+                        <h3>Déductions</h3>
                     </div>
-                    <ul class="list-group">
-                        {% for deduction in payslip.deductions %}
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span>{{ deduction.salary_component }}</span>
-                                <span>{{ deduction.amount|number_format(2, '.', ',') }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
+                    {% if payslip.deductions and payslip.deductions|length > 0 %}
+                        <ul class="list-group">
+                            {% for deduction in payslip.deductions %}
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>{{ deduction.salary_component ?? 'N/A' }}</span>
+                                    <span>
+                                        {% if deduction.amount is not null %}
+                                            {{ deduction.amount|number_format(2, ',', ' ') }} €
+                                        {% else %}
+                                            0,00 €
+                                        {% endif %}
+                                    </span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="card-body">
+                            <p>Aucune déduction enregistrée</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
         <div class="card" style="margin-top: 20px;">
             <div class="card-body">
-                <p class="d-flex justify-content-between"><strong>Gross Pay:</strong> <span>{{ payslip.gross_pay|number_format(2, '.', ',') }}</span></p>
-                <p class="d-flex justify-content-between"><strong>Total Deductions:</strong> <span>{{ payslip.total_deduction|number_format(2, '.', ',') }}</span></p>
+                <p class="d-flex justify-content-between">
+                    <strong>Salaire brut:</strong> 
+                    <span>
+                        {% if payslip.gross_pay is not null %}
+                            {{ payslip.gross_pay|number_format(2, ',', ' ') }} €
+                        {% else %}
+                            0,00 €
+                        {% endif %}
+                    </span>
+                </p>
+                <p class="d-flex justify-content-between">
+                    <strong>Total déductions:</strong> 
+                    <span>
+                        {% if payslip.total_deduction is not null %}
+                            {{ payslip.total_deduction|number_format(2, ',', ' ') }} €
+                        {% else %}
+                            0,00 €
+                        {% endif %}
+                    </span>
+                </p>
                 <hr>
-                <h4 class="d-flex justify-content-between"><strong>Net Pay:</strong> <span>{{ payslip.net_pay|number_format(2, '.', ',') }}</span></h4>
+                <h4 class="d-flex justify-content-between">
+                    <strong>Salaire net:</strong> 
+                    <span>
+                        {% if payslip.net_pay is not null %}
+                            {{ payslip.net_pay|number_format(2, ',', ' ') }} €
+                        {% else %}
+                            0,00 €
+                        {% endif %}
+                    </span>
+                </h4>
             </div>
         </div>
     </div>

@@ -30,7 +30,7 @@ class EmployeeController extends AbstractController
         ]);
     }
 
-    #[Route('/employee/{id}', name: 'app_employee_detail')]
+    #[Route('/employee/{id}', name: 'app_employee_detail', requirements: ['id' => '.+'])]
     public function detail(string $id): Response
     {
         $employee = $this->erpNextService->getEmployee($id);

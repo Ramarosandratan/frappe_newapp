@@ -1,65 +1,175 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Salary Slip Details{% endblock %}
+{% block title %}Détails de la fiche de paie{% endblock %}
 
 {% block body %}
 <div class="container mt-4">
-    <h1>Salary Slip</h1>
-
-    <div class="card">
-        <div class="card-header">
-            <h2>{{ payslip.employee_name }}</h2>
-        </div>
-        <div class="card-body">
-            <p><strong>Employee ID:</strong> {{ payslip.employee }}</p>
-            <p><strong>Period:</strong> {{ payslip.start_date|date('d/m/Y') }} - {{ payslip.end_date|date('d/m/Y') }}</p>
-            <p><strong>Posting Date:</strong> {{ payslip.posting_date|date('d/m/Y') }}</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Fiche de paie</h1>
+        <div>
+            {% if payslip.name is defined and payslip.name is not empty %}
+                <a href="{{ path('app_payslip_pdf', {id: payslip.name|encode_id}) }}" 
+                   class="btn btn-danger" 
+                   target="_blank"
+                   title="Ouvrir le PDF dans un nouvel onglet">
+                    <i class="fas fa-file-pdf"></i> Exporter en PDF
+                </a>
+            {% else %}
+                <button class="btn btn-danger" disabled title="ID de fiche de paie non disponible">
+                    <i class="fas fa-file-pdf"></i> Exporter en PDF
+                </button>
+            {% endif %}
         </div>
     </div>
 
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Earnings</h3>
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">{{ payslip.employee_name ?? 'N/A' }}</h2>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>ID Employé:</strong> {{ payslip.employee ?? 'N/A' }}</p>
                 </div>
-                <ul class="list-group list-group-flush">
-                    {% for earning in payslip.earnings %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ earning.salary_component }}
-                            <span>{{ earning.amount|number_format(2, '.', ',') }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
+                <div class="col-md-4">
+                    <p><strong>Période:</strong> 
+                        {% if payslip.start_date and payslip.end_date %}
+                            {{ payslip.start_date|date('d/m/Y') }} - {{ payslip.end_date|date('d/m/Y') }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Date de publication:</strong> 
+                        {% if payslip.posting_date %}
+                            {{ payslip.posting_date|date('d/m/Y') }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0"><i class="fas fa-plus-circle"></i> Gains</h3>
+                </div>
+                {% if payslip.earnings and payslip.earnings|length > 0 %}
+                    <ul class="list-group list-group-flush">
+                        {% for earning in payslip.earnings %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ earning.salary_component ?? 'N/A' }}</span>
+                                <span class="badge bg-success rounded-pill amount">
+                                    {% if earning.amount is not null %}
+                                        {{ earning.amount|number_format(2, ',', ' ') }} €
+                                    {% else %}
+                                        0,00 €
+                                    {% endif %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle"></i> Aucun gain enregistré
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Deductions</h3>
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h3 class="mb-0"><i class="fas fa-minus-circle"></i> Déductions</h3>
                 </div>
-                <ul class="list-group list-group-flush">
-                    {% for deduction in payslip.deductions %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ deduction.salary_component }}
-                            <span>{{ deduction.amount|number_format(2, '.', ',') }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
+                {% if payslip.deductions and payslip.deductions|length > 0 %}
+                    <ul class="list-group list-group-flush">
+                        {% for deduction in payslip.deductions %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>{{ deduction.salary_component ?? 'N/A' }}</span>
+                                <span class="badge bg-warning text-dark rounded-pill amount">
+                                    {% if deduction.amount is not null %}
+                                        {{ deduction.amount|number_format(2, ',', ' ') }} €
+                                    {% else %}
+                                        0,00 €
+                                    {% endif %}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="fas fa-info-circle"></i> Aucune déduction enregistrée
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <div class="card mt-4">
+    <div class="card mt-4 border-primary">
+        <div class="card-header bg-light">
+            <h4 class="mb-0"><i class="fas fa-calculator"></i> Résumé</h4>
+        </div>
         <div class="card-body">
-            <p class="d-flex justify-content-between"><strong>Gross Pay:</strong> <span>{{ payslip.gross_pay|number_format(2, '.', ',') }}</span></p>
-            <p class="d-flex justify-content-between"><strong>Total Deductions:</strong> <span>{{ payslip.total_deduction|number_format(2, '.', ',') }}</span></p>
-            <hr>
-            <h4 class="d-flex justify-content-between"><strong>Net Pay:</strong> <span>{{ payslip.net_pay|number_format(2, '.', ',') }}</span></h4>
+            <div class="row">
+                <div class="col-md-4">
+                    <p class="d-flex justify-content-between">
+                        <strong>Salaire brut:</strong> 
+                        <span class="text-success amount">
+                            {% if payslip.gross_pay is not null %}
+                                {{ payslip.gross_pay|number_format(2, ',', ' ') }} €
+                            {% else %}
+                                0,00 €
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <p class="d-flex justify-content-between">
+                        <strong>Total déductions:</strong> 
+                        <span class="text-warning amount">
+                            {% if payslip.total_deduction is not null %}
+                                {{ payslip.total_deduction|number_format(2, ',', ' ') }} €
+                            {% else %}
+                                0,00 €
+                            {% endif %}
+                        </span>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <hr class="d-md-none">
+                    <h4 class="d-flex justify-content-between text-primary">
+                        <strong>Salaire net:</strong> 
+                        <span class="amount">
+                            {% if payslip.net_pay is not null %}
+                                {{ payslip.net_pay|number_format(2, ',', ' ') }} €
+                            {% else %}
+                                0,00 €
+                            {% endif %}
+                        </span>
+                    </h4>
+                </div>
+            </div>
         </div>
     </div>
 
-    <a href="{{ path('app_payslip_pdf', {id: payslip.name}) }}" class="btn btn-danger mt-3">Export to PDF</a>
-    <a href="{{ path('app_employee_detail', {id: payslip.employee}) }}" class="btn btn-secondary mt-3">Back to Employee</a>
+    <div class="mt-4 d-flex gap-2 flex-wrap">
+        {% if payslip.employee %}
+            <a href="{{ path('app_employee_detail', {id: payslip.employee}) }}" class="btn btn-secondary">
+                <i class="fas fa-user"></i> Retour à l'employé
+            </a>
+        {% endif %}
+        <a href="{{ path('app_employee_list') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-list"></i> Liste des employés
+        </a>
+    </div>
 </div>
 {% endblock %}

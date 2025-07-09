@@ -1,45 +1,115 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Employee Details{% endblock %}
+{% block title %}Détails de l'employé{% endblock %}
 
 {% block body %}
 <div class="container mt-4">
-    <h1>{{ employee.employee_name }}</h1>
-    <p><strong>Employee Number:</strong> {{ employee.name }}</p>
-    <p><strong>Date of Joining:</strong> {{ employee.date_of_joining|date('Y-m-d') }}</p>
-    <p><strong>Company:</strong> {{ employee.company }}</p>
-    <p><strong>Gender:</strong> {{ employee.gender }}</p>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h1 class="mb-0">{{ employee.employee_name ?? 'N/A' }}</h1>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Numéro d'employé:</strong> {{ employee.employee_number ?? 'N/A' }}</p>
+                            <p><strong>Date d'embauche:</strong> 
+                                {% if employee.date_of_joining %}
+                                    {{ employee.date_of_joining|date('d/m/Y') }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Entreprise:</strong> {{ employee.company ?? 'N/A' }}</p>
+                            <p><strong>Genre:</strong> {{ employee.gender ?? 'N/A' }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <h2 class="mt-5">Salary Slips</h2>
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Month/Year</th>
-                <th>Gross Pay</th>
-                <th>Deductions</th>
-                <th>Net Pay</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for slip in salary_slips %}
-                <tr>
-                    <td>{{ slip.start_date|date('F Y') }}</td>
-                    <td>{{ slip.gross_pay|number_format(2, '.', ',') }}</td>
-                    <td>{{ slip.total_deduction|number_format(2, '.', ',') }}</td>
-                    <td>{{ slip.net_pay|number_format(2, '.', ',') }}</td>
-                    <td>
-                        <a href="{{ path('app_payslip_view', {'id': slip.name|url_encode }) }}" class="btn btn-sm btn-info">View Payslip</a>
-                    </td>
-                </tr>
+    <div class="card mt-4">
+        <div class="card-header">
+            <h2 class="mb-0">Fiches de paie</h2>
+        </div>
+        <div class="card-body">
+            {% if salary_slips and salary_slips|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col">Période</th>
+                                <th scope="col">Salaire brut</th>
+                                <th scope="col">Déductions</th>
+                                <th scope="col">Salaire net</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for slip in salary_slips %}
+                                <tr>
+                                    <td>
+                                        {% if slip.start_date %}
+                                            {{ slip.start_date|date('F Y')|capitalize }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="amount text-success">
+                                            {% if slip.gross_pay is not null %}
+                                                {{ slip.gross_pay|number_format(2, ',', ' ') }} €
+                                            {% else %}
+                                                0,00 €
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="amount text-warning">
+                                            {% if slip.total_deduction is not null %}
+                                                {{ slip.total_deduction|number_format(2, ',', ' ') }} €
+                                            {% else %}
+                                                0,00 €
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <span class="amount text-primary fw-bold">
+                                            {% if slip.net_pay is not null %}
+                                                {{ slip.net_pay|number_format(2, ',', ' ') }} €
+                                            {% else %}
+                                                0,00 €
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if slip.name %}
+                                            <a href="{{ path('app_payslip_view', {'id': slip.name|encode_id }) }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> Voir
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             {% else %}
-                <tr>
-                    <td colspan="5" class="text-center">No salary slips found.</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                <div class="alert alert-info text-center">
+                    <i class="fas fa-info-circle"></i> Aucune fiche de paie trouvée pour cet employé.
+                </div>
+            {% endif %}
+        </div>
+    </div>
 
-    <a href="{{ path('app_employee_list') }}" class="btn btn-secondary mt-3">Back to list</a>
+    <div class="mt-4">
+        <a href="{{ path('app_employee_list') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Retour à la liste
+        </a>
+    </div>
 </div>
 {% endblock %}

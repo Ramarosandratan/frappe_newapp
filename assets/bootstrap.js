@@ -1,5 +1,7 @@
 import { startStimulusApp } from '@symfony/stimulus-bundle';
 
 const app = startStimulusApp();
-// register any custom, 3rd party controllers here
-// app.register('some_controller_name', SomeImportedController);
+
+// Import and register our custom controllers
+import ChartCustomController from './controllers/chart_custom_controller.js';
+app.register('chart-custom', ChartCustomController);

@@ -2,6 +2,15 @@ knp_snappy:
     pdf:
         enabled:    true
         binary:     /usr/bin/wkhtmltopdf
-        options:    []
+        options:
+            page-size: A4
+            margin-top: 10mm
+            margin-right: 10mm
+            margin-bottom: 10mm
+            margin-left: 10mm
+            encoding: utf-8
+            disable-smart-shrinking: true
+            print-media-type: true
+            no-outline: true
     image:
         enabled:    false

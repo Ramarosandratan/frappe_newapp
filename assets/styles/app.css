@@ -1,3 +1,56 @@
 body {
     background-color: #f8f9fa;
 }
+
+/* Amélioration des cartes */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+/* Amélioration des tableaux */
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+}
+
+/* Amélioration des badges */
+.badge {
+    font-size: 0.875em;
+}
+
+/* Espacement pour les boutons */
+.btn + .btn {
+    margin-left: 0.5rem;
+}
+
+/* Amélioration des alertes */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+}
+
+/* Style pour les montants */
+.amount {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+/* Amélioration des icônes */
+.fas, .far {
+    margin-right: 0.25rem;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .d-flex.gap-2 {
+        flex-direction: column;
+    }
+    
+    .d-flex.gap-2 .btn {
+        margin-bottom: 0.5rem;
+    }
+}

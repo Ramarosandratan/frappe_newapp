@@ -27,11 +27,53 @@
         </div>
     </div>
 
-    {% if chart is defined %}
-        <div class="mb-4" style="height: 400px;">
-            {{ render_chart(chart) }}
+    <div class="card mb-4">
+        <div class="card-header">
+            Évolution Mensuelle des Salaires
         </div>
-    {% endif %}
+        <div class="card-body">
+            {% if chart is defined and monthlyEvolutionData|length > 0 %}
+                <div class="alert alert-success">
+                    Debug: Chart object exists and data is available ({{ monthlyEvolutionData|length }} months)
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="chartType">Type de graphique:</label>
+                            <select id="chartType" class="form-control">
+                                <option value="line">Ligne</option>
+                                <option value="bar">Barre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Afficher les composants:</label>
+                            <div id="componentCheckboxes">
+                                {% for component in allComponents %}
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="component-{{ component|replace({' ': '-'}) }}" value="{{ component }}" data-component="{{ component }}">
+                                        <label class="form-check-label" for="component-{{ component|replace({' ': '-'}) }}">{{ component }}</label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="height: 400px; border: 2px solid #007bff; padding: 10px;" data-controller="chart chart-custom">
+                    {{ render_chart(chart) }}
+                </div>
+            {% elseif chart is defined %}
+                <div class="alert alert-warning">
+                    Debug: Chart object exists but no monthly data ({{ monthlyEvolutionData|length }} months)
+                </div>
+            {% else %}
+                <div id="noDataMessage" class="alert alert-info text-center">
+                    Debug: No chart object created - Aucune donnée d'évolution mensuelle disponible pour l'année sélectionnée.
+                </div>
+            {% endif %}
+        </div>
+    </div>
 
     <div class="table-responsive">
         <table class="table table-bordered table-striped table-hover">
@@ -47,15 +89,15 @@
                 </tr>
             </thead>
             <tbody>
-                {% for month, data in statsByMonth %}
+                {% for data in monthlyEvolutionData %}
                     <tr>
-                        <td><strong><a href="{{ path('app_stats_monthly_detail', {'startDate': data.start_date, 'endDate': data.end_date}) }}">{{ month }}</a></strong></td>
+                        <td><strong><a href="{{ path('app_stats_monthly_detail', {'startDate': data.month ~ '-01', 'endDate': (data.month ~ '-01')|date('Y-m-t')}) }}"><span class="month-year-display" data-month-year="{{ data.month|date('Y-m') }}"></span></a></strong></td>
                         {% for component in allComponents %}
                             <td class="text-center">{{ data.components[component]|default(0)|number_format(2, ',', ' ') }}</td>
                         {% endfor %}
-                        <td class="text-right font-weight-bold">{{ data.gross_pay|number_format(2, ',', ' ') }}</td>
-                        <td class="text-right text-danger">({{ data.total_deduction|number_format(2, ',', ' ') }})</td>
-                        <td class="text-right font-weight-bold text-success">{{ data.net_pay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right font-weight-bold">{{ data.totalGrossPay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right text-danger">({{ (data.totalGrossPay - data.totalNetPay)|number_format(2, ',', ' ') }})</td>
+                        <td class="text-right font-weight-bold text-success">{{ data.totalNetPay|number_format(2, ',', ' ') }}</td>
                     </tr>
                 {% else %}
                     <tr>
@@ -66,4 +108,43 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, checking for chart elements...');
+            
+            // Debug: vérifier si Chart.js est chargé
+            if (typeof Chart !== 'undefined') {
+                console.log('Chart.js is loaded, version:', Chart.version);
+            } else {
+                console.error('Chart.js is not loaded!');
+            }
+            
+            // Debug: vérifier les éléments canvas
+            const canvasElements = document.querySelectorAll('canvas');
+            console.log('Found canvas elements:', canvasElements.length);
+            canvasElements.forEach((canvas, index) => {
+                console.log(`Canvas ${index}:`, canvas);
+                if (canvas.chart) {
+                    console.log(`Canvas ${index} has chart:`, canvas.chart);
+                }
+            });
+            
+            // Fonction pour formater le mois en français
+            function formatMonthYear(dateString) {
+                const [year, month] = dateString.split('-');
+                const date = new Date(year, month - 1); // month - 1 car les mois sont de 0 à 11
+                return date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+            }
+
+            // Mettre à jour les noms de mois après le chargement du DOM
+            document.querySelectorAll('.month-year-display').forEach(span => {
+                const monthYear = span.dataset.monthYear;
+                span.textContent = formatMonthYear(monthYear);
+            });
+        });
+    </script>
 {% endblock %}
