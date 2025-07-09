@@ -93,7 +93,7 @@ class ErpNextService
     }
 
     // Universal resource fetcher (DRY for get/post/list)
-    private function getResource(string $doctype, string $name): ?array
+    public function getResource(string $doctype, string $name): ?array
     {
         try {
             $res = $this->request('GET', '/api/method/frappe.client.get', [
@@ -709,12 +709,21 @@ class ErpNextService
             $this->logger->info("Creating salary slip", [
                 'employee' => $dataWithDoctype['employee'],
                 'period' => $dataWithDoctype['start_date'] . ' to ' . $dataWithDoctype['end_date'],
-                'structure' => $dataWithDoctype['salary_structure']
+                'structure' => $dataWithDoctype['salary_structure'],
+                'base_amount' => $dataWithDoctype['base'] ?? 'not specified'
             ]);
             
-            return $this->request('POST', '/api/method/frappe.client.insert', [
+            // Créer la fiche de paie
+            $result = $this->request('POST', '/api/method/frappe.client.insert', [
                 'json' => ['doc' => $dataWithDoctype]
             ]);
+            
+            // Si un montant de base est spécifié, mettre à jour la fiche de paie avec les montants corrects
+            if (isset($dataWithDoctype['base']) && is_numeric($dataWithDoctype['base']) && $dataWithDoctype['base'] > 0) {
+                $this->updateSalarySlipAmounts($result['name'], (float)$dataWithDoctype['base']);
+            }
+            
+            return $result;
         } catch (\Throwable $e) {
             $msg = $e->getMessage();
             
@@ -733,6 +742,157 @@ class ErpNextService
         return $this->request('POST', '/api/method/frappe.client.save', [
             'json' => ['doc' => $data]
         ]);
+    }
+
+    /**
+     * Met à jour les montants dans une fiche de paie avec le montant de base spécifié
+     */
+    public function updateSalarySlipAmounts(string $salarySlipName, float $baseAmount): array
+    {
+        try {
+            // Récupérer la fiche de paie complète
+            $salarySlip = $this->getResource('Salary Slip', $salarySlipName);
+            
+            if (!$salarySlip) {
+                throw new \RuntimeException("Salary slip not found: $salarySlipName");
+            }
+            
+            $this->logger->info("Updating salary slip amounts", [
+                'slip' => $salarySlipName,
+                'base_amount' => $baseAmount,
+                'employee' => $salarySlip['employee'] ?? 'unknown'
+            ]);
+            
+            // Mettre à jour les montants des composants earnings
+            $totalEarnings = 0;
+            $hasEarnings = false;
+            
+            if (isset($salarySlip['earnings']) && is_array($salarySlip['earnings']) && count($salarySlip['earnings']) > 0) {
+                $hasEarnings = true;
+                foreach ($salarySlip['earnings'] as &$earning) {
+                    if (isset($earning['salary_component'])) {
+                        $component = $earning['salary_component'];
+                        
+                        // Calculer le montant selon le composant
+                        if ($component === 'Salaire Base' || (isset($earning['abbr']) && $earning['abbr'] === 'SB')) {
+                            $earning['amount'] = $baseAmount;
+                            $totalEarnings += $baseAmount;
+                        } elseif ($component === 'Indemnité' || (isset($earning['abbr']) && $earning['abbr'] === 'IND')) {
+                            $indemnityAmount = $baseAmount * 0.3;
+                            $earning['amount'] = $indemnityAmount;
+                            $totalEarnings += $indemnityAmount;
+                        }
+                        
+                        $this->logger->debug("Updated earning component", [
+                            'component' => $component,
+                            'amount' => $earning['amount']
+                        ]);
+                    }
+                }
+            }
+            
+            // Si pas de composants earnings, créer les composants de base
+            if (!$hasEarnings) {
+                $this->logger->info("No earnings components found, creating default components");
+                
+                $salarySlip['earnings'] = [
+                    [
+                        'salary_component' => 'Salaire Base',
+                        'abbr' => 'SB',
+                        'amount' => $baseAmount,
+                        'default_amount' => $baseAmount,
+                        'depends_on_payment_days' => 1,
+                        'is_tax_applicable' => 1
+                    ],
+                    [
+                        'salary_component' => 'Indemnité',
+                        'abbr' => 'IND',
+                        'amount' => $baseAmount * 0.3,
+                        'default_amount' => 0,
+                        'depends_on_payment_days' => 0,
+                        'is_tax_applicable' => 1,
+                        'amount_based_on_formula' => 1,
+                        'formula' => 'SB * 0.3'
+                    ]
+                ];
+                
+                $totalEarnings = $baseAmount + ($baseAmount * 0.3);
+            }
+            
+            // Mettre à jour les montants des composants deductions
+            $totalDeductions = 0;
+            $hasDeductions = false;
+            
+            if (isset($salarySlip['deductions']) && is_array($salarySlip['deductions']) && count($salarySlip['deductions']) > 0) {
+                $hasDeductions = true;
+                foreach ($salarySlip['deductions'] as &$deduction) {
+                    if (isset($deduction['salary_component'])) {
+                        $component = $deduction['salary_component'];
+                        
+                        // Calculer le montant selon le composant
+                        if ($component === 'Taxe sociale' || (isset($deduction['abbr']) && $deduction['abbr'] === 'TS')) {
+                            $taxAmount = ($baseAmount + ($baseAmount * 0.3)) * 0.2;
+                            $deduction['amount'] = $taxAmount;
+                            $totalDeductions += $taxAmount;
+                        }
+                        
+                        $this->logger->debug("Updated deduction component", [
+                            'component' => $component,
+                            'amount' => $deduction['amount']
+                        ]);
+                    }
+                }
+            }
+            
+            // Si pas de composants deductions, créer les composants de base
+            if (!$hasDeductions) {
+                $this->logger->info("No deduction components found, creating default components");
+                
+                $taxAmount = ($baseAmount + ($baseAmount * 0.3)) * 0.2;
+                $salarySlip['deductions'] = [
+                    [
+                        'salary_component' => 'Taxe sociale',
+                        'abbr' => 'TS',
+                        'amount' => $taxAmount,
+                        'default_amount' => 0,
+                        'depends_on_payment_days' => 0,
+                        'is_tax_applicable' => 1,
+                        'amount_based_on_formula' => 1,
+                        'formula' => '(SB + IND) * 0.2'
+                    ]
+                ];
+                
+                $totalDeductions = $taxAmount;
+            }
+            
+            // Mettre à jour les totaux
+            $salarySlip['total_earning'] = $totalEarnings;
+            $salarySlip['total_deduction'] = $totalDeductions;
+            $salarySlip['net_pay'] = $totalEarnings - $totalDeductions;
+            $salarySlip['gross_pay'] = $totalEarnings;
+            
+            $this->logger->info("Updated salary slip totals", [
+                'slip' => $salarySlipName,
+                'total_earning' => $totalEarnings,
+                'total_deduction' => $totalDeductions,
+                'net_pay' => $salarySlip['net_pay']
+            ]);
+            
+            // Sauvegarder la fiche de paie mise à jour
+            $result = $this->request('POST', '/api/method/frappe.client.save', [
+                'json' => ['doc' => $salarySlip]
+            ]);
+            
+            return $result;
+            
+        } catch (\Throwable $e) {
+            $this->logger->error("Error updating salary slip amounts", [
+                'slip' => $salarySlipName,
+                'base_amount' => $baseAmount,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 
     // -------------- STRUCTURE ASSIGNMENTS ----------------------
@@ -811,6 +971,97 @@ class ErpNextService
             1
         );
         return $assignments ? $assignments[0] : null;
+    }
+
+    /**
+     * Met à jour le montant de base d'une assignation de structure salariale
+     */
+    public function updateSalaryStructureAssignmentBase(string $employeeId, string $salaryStructureName, string $fromDate, float $baseAmount): array
+    {
+        try {
+            // Trouver l'assignation existante
+            $assignment = $this->getEmployeeSalaryStructureAssignment($employeeId, $fromDate);
+            
+            if (!$assignment) {
+                throw new \RuntimeException("No salary structure assignment found for employee $employeeId on date $fromDate");
+            }
+            
+            // Récupérer le document complet
+            $fullAssignment = $this->getResource('Salary Structure Assignment', $assignment['name']);
+            
+            if (!$fullAssignment) {
+                throw new \RuntimeException("Failed to retrieve full assignment document: {$assignment['name']}");
+            }
+            
+            // Vérifier si le montant de base est déjà correct
+            if (isset($fullAssignment['base']) && abs((float)$fullAssignment['base'] - $baseAmount) < 0.01) {
+                $this->logger->info("Base amount already correct", [
+                    'assignment' => $assignment['name'],
+                    'current_base' => $fullAssignment['base'],
+                    'requested_base' => $baseAmount
+                ]);
+                return $fullAssignment;
+            }
+            
+            // Vérifier si le document est déjà soumis
+            if (isset($fullAssignment['docstatus']) && $fullAssignment['docstatus'] == 1) {
+                $this->logger->warning("Cannot update base amount - assignment already submitted", [
+                    'assignment' => $assignment['name'],
+                    'employee' => $employeeId,
+                    'current_base' => $fullAssignment['base'] ?? 0,
+                    'requested_base' => $baseAmount
+                ]);
+                
+                // Retourner l'assignation existante sans modification
+                return $fullAssignment;
+            }
+            
+            $oldBase = $fullAssignment['base'] ?? 0;
+            
+            // Mettre à jour le montant de base
+            $fullAssignment['base'] = $baseAmount;
+            
+            $this->logger->info("Updating salary structure assignment base amount", [
+                'assignment' => $assignment['name'],
+                'employee' => $employeeId,
+                'old_base' => $oldBase,
+                'new_base' => $baseAmount
+            ]);
+            
+            // Sauvegarder le document mis à jour
+            $result = $this->request('POST', '/api/method/frappe.client.save', [
+                'json' => ['doc' => $fullAssignment]
+            ]);
+            
+            return $result;
+            
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            
+            // Si c'est une erreur de modification après soumission, on l'ignore
+            if (str_contains($msg, 'UpdateAfterSubmitError') || str_contains($msg, 'after submission')) {
+                $this->logger->warning("Cannot update assignment base - already submitted", [
+                    'employee' => $employeeId,
+                    'structure' => $salaryStructureName,
+                    'from_date' => $fromDate,
+                    'base_amount' => $baseAmount,
+                    'error' => $msg
+                ]);
+                
+                // Retourner l'assignation existante
+                $assignment = $this->getEmployeeSalaryStructureAssignment($employeeId, $fromDate);
+                return $this->getResource('Salary Structure Assignment', $assignment['name']);
+            }
+            
+            $this->logger->error("Error updating salary structure assignment base", [
+                'employee' => $employeeId,
+                'structure' => $salaryStructureName,
+                'from_date' => $fromDate,
+                'base_amount' => $baseAmount,
+                'error' => $msg
+            ]);
+            throw $e;
+        }
     }
 
     public function submitSalaryStructureAssignment(string $name): array

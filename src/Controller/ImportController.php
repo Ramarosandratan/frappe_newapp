@@ -558,13 +558,36 @@ class ImportController extends AbstractController
                     ]);
                 }
 
+                $baseAmount = $this->parseSalaryAmount($record['Salaire Base']);
+                
+                // Mettre à jour l'assignation de structure salariale avec le montant de base correct
+                try {
+                    $this->erpNextService->updateSalaryStructureAssignmentBase(
+                        $employeeId,
+                        $structureName,
+                        $assignmentDate->format('Y-m-d'),
+                        $baseAmount
+                    );
+                    $this->logger->info("Updated salary structure assignment base amount", [
+                        'employee' => $employeeId,
+                        'structure' => $structureName,
+                        'base_amount' => $baseAmount
+                    ]);
+                } catch (\Throwable $e) {
+                    $this->logger->warning("Failed to update salary structure assignment base amount", [
+                        'employee' => $employeeId,
+                        'structure' => $structureName,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+
                 $salaryData = [
                     'employee' => $employeeId,
                     'start_date' => $startDate->format('Y-m-d'),
                     'end_date' => $endDate->format('Y-m-d'),
                     'posting_date' => date('Y-m-d'),
                     'salary_structure' => $structureName,
-                    'base' => $this->parseSalaryAmount($record['Salaire Base'])
+                    'base' => $baseAmount
                 ];
 
                 $startTime = microtime(true);
