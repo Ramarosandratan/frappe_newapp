@@ -1,0 +1,108 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accueil - ERPNext Integration{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <div class="jumbotron bg-light p-5 rounded">
+        <h1 class="display-4">Bienvenue dans l'application de gestion des salaires</h1>
+        <p class="lead">Cette application vous permet de gérer les employés, les structures salariales et les fiches de paie en intégration avec ERPNext.</p>
+        <hr class="my-4">
+        <p>Utilisez le menu de navigation pour accéder aux différentes fonctionnalités.</p>
+    </div>
+    
+    {% if error is defined %}
+        <div class="alert alert-danger mt-4">
+            <h4 class="alert-heading">Erreur lors du chargement des statistiques</h4>
+            <p>{{ error }}</p>
+        </div>
+    {% else %}
+        <div class="row mt-4">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-header">Employés</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ employeeCount }}</h5>
+                        <p class="card-text">Employés enregistrés</p>
+                        <a href="{{ path('app_employee_list') }}" class="btn btn-light btn-sm">Voir les employés</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-header">Structures salariales</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ salaryStructureCount }}</h5>
+                        <p class="card-text">Structures salariales définies</p>
+                        <a href="{{ path('app_import') }}" class="btn btn-light btn-sm">Importer des structures</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info mb-3">
+                    <div class="card-header">Fiches de paie ({{ currentMonth|date('F Y') }})</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ currentMonthSlipCount }}</h5>
+                        <p class="card-text">Fiches de paie générées</p>
+                        <a href="{{ path('app_salary_generator') }}" class="btn btn-light btn-sm">Générer des fiches</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-warning mb-3">
+                    <div class="card-header">Total des salaires ({{ currentMonth|date('F Y') }})</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ totalNetPay|number_format(2, ',', ' ') }}</h5>
+                        <p class="card-text">Total des salaires nets</p>
+                        <a href="{{ path('app_stats') }}" class="btn btn-light btn-sm">Voir les statistiques</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Actions rapides</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            <a href="{{ path('app_import') }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">Importer des données</h5>
+                                </div>
+                                <p class="mb-1">Importer des employés, des structures salariales et des données de salaire à partir de fichiers CSV.</p>
+                            </a>
+                            <a href="{{ path('app_salary_modifier') }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">Modifier des éléments de salaire</h5>
+                                </div>
+                                <p class="mb-1">Modifier en masse des éléments de salaire selon des conditions spécifiques.</p>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Documentation</h5>
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">Fonctionnalités principales</h5>
+                        <ul>
+                            <li><strong>Import de fichiers CSV</strong> : Importez des employés, des structures salariales et des données de salaire.</li>
+                            <li><strong>Gestion des employés</strong> : Consultez la liste des employés et leurs fiches de paie.</li>
+                            <li><strong>Fiches de paie</strong> : Consultez et exportez les fiches de paie en PDF.</li>
+                            <li><strong>Statistiques</strong> : Consultez les statistiques des salaires par mois et par composant.</li>
+                            <li><strong>Génération de salaires</strong> : Générez automatiquement des fiches de paie pour une période donnée.</li>
+                            <li><strong>Modification des éléments de salaire</strong> : Modifiez en masse des éléments de salaire selon des conditions spécifiques.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

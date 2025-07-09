@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Détails des Salaires - {{ monthTitle }}{% endblock %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">Détails des Salaires pour {{ monthTitle }}</h1>
+
+    <div class="mb-3">
+        <a href="{{ path('app_stats') }}" class="btn btn-secondary">Retour aux Statistiques</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th scope="col">Employé</th>
+                    <th scope="col">Date Début</th>
+                    <th scope="col">Date Fin</th>
+                    <th scope="col" class="text-right">Salaire Brut</th>
+                    <th scope="col" class="text-right">Déductions</th>
+                    <th scope="col" class="text-right">Salaire Net</th>
+                    <th scope="col" class="text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for slip in salarySlips %}
+                    <tr>
+                        <td>{{ slip.employee_name }}</td>
+                        <td>{{ slip.start_date|date('d/m/Y') }}</td>
+                        <td>{{ slip.end_date|date('d/m/Y') }}</td>
+                        <td class="text-right">{{ slip.gross_pay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right text-danger">{{ slip.total_deduction|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right text-success font-weight-bold">{{ slip.net_pay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-center">
+                            <a href="{{ path('app_payslip_view', {'id': slip.name}) }}" class="btn btn-sm btn-primary">Voir Détails</a>
+                            <a href="{{ path('app_payslip_pdf', {'id': slip.name}) }}" class="btn btn-sm btn-success" target="_blank">PDF</a>
+                            <a href="{{ path('app_employee_detail', {'id': slip.employee}) }}" class="btn btn-sm btn-info">Fiche Employé</a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">Aucune fiche de paie pour cette période.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

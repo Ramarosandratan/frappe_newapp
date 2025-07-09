@@ -18,3 +18,10 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\Service\ErpNextService:
+        arguments:
+            $apiBase: '%env(API_BASE)%'
+            $apiKey: '%env(API_KEY)%'
+            $apiSecret: '%env(API_SECRET)%'
+            $logger: '@logger'

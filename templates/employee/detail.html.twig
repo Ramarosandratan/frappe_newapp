@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Employee Details{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1>{{ employee.employee_name }}</h1>
+    <p><strong>Employee Number:</strong> {{ employee.name }}</p>
+    <p><strong>Date of Joining:</strong> {{ employee.date_of_joining|date('Y-m-d') }}</p>
+    <p><strong>Company:</strong> {{ employee.company }}</p>
+    <p><strong>Gender:</strong> {{ employee.gender }}</p>
+
+    <h2 class="mt-5">Salary Slips</h2>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Month/Year</th>
+                <th>Gross Pay</th>
+                <th>Deductions</th>
+                <th>Net Pay</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for slip in salary_slips %}
+                <tr>
+                    <td>{{ slip.start_date|date('F Y') }}</td>
+                    <td>{{ slip.gross_pay|number_format(2, '.', ',') }}</td>
+                    <td>{{ slip.total_deduction|number_format(2, '.', ',') }}</td>
+                    <td>{{ slip.net_pay|number_format(2, '.', ',') }}</td>
+                    <td>
+                        <a href="{{ path('app_payslip_view', {'id': slip.name|url_encode }) }}" class="btn btn-sm btn-info">View Payslip</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No salary slips found.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_employee_list') }}" class="btn btn-secondary mt-3">Back to list</a>
+</div>
+{% endblock %}

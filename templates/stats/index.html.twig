@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Statistiques des Salaires{% endblock %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">Statistiques des Salaires</h1>
+
+    <div class="mb-3">
+        <a href="{{ path('app_stats_monthly_summary') }}" class="btn btn-info">Voir le Récapitulatif Mensuel par Employé</a>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <form action="{{ path('app_stats') }}" method="get">
+                <div class="input-group">
+                    <select name="year" class="form-control" onchange="this.form.submit()">
+                        {% for year in years %}
+                            <option value="{{ year }}"{{ year == selectedYear ? ' selected' : '' }}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" type="submit">Filtrer</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if chart is defined %}
+        <div class="mb-4" style="height: 400px;">
+            {{ render_chart(chart) }}
+        </div>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th scope="col">Mois</th>
+                    {% for component in allComponents %}
+                        <th scope="col" class="text-center">{{ component }}</th>
+                    {% endfor %}
+                    <th scope="col" class="text-right">Total Brut</th>
+                    <th scope="col" class="text-right">Total Déductions</th>
+                    <th scope="col" class="text-right">Total Net</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for month, data in statsByMonth %}
+                    <tr>
+                        <td><strong><a href="{{ path('app_stats_monthly_detail', {'startDate': data.start_date, 'endDate': data.end_date}) }}">{{ month }}</a></strong></td>
+                        {% for component in allComponents %}
+                            <td class="text-center">{{ data.components[component]|default(0)|number_format(2, ',', ' ') }}</td>
+                        {% endfor %}
+                        <td class="text-right font-weight-bold">{{ data.gross_pay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right text-danger">({{ data.total_deduction|number_format(2, ',', ' ') }})</td>
+                        <td class="text-right font-weight-bold text-success">{{ data.net_pay|number_format(2, ',', ' ') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="{{ allComponents|length + 4 }}" class="text-center">Aucune donnée à afficher.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

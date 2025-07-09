@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Employee List{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1>Employee List</h1>
+
+    <form action="{{ path('app_employee_list') }}" method="get" class="mb-4">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Search by name..." value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Employee Number</th>
+                <th>Date of Joining</th>
+                <th>Company</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee in employees %}
+                <tr>
+                    <td>{{ employee.employee_name }}</td>
+                    <td>{{ employee.name }}</td>
+                    <td>{{ employee.date_of_joining|date('Y-m-d') }}</td>
+                    <td>{{ employee.company }}</td>
+                    <td>
+                        <a href="{{ path('app_employee_detail', {'id': employee.name}) }}" class="btn btn-sm btn-info">View Details</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No employees found.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+app_payslip_view:
+  path: /payslip/{id}
+  controller: App\Controller\PayslipController::view
+  requirements:
+    id: '.+'
+
+app_payslip_pdf:
+  path: /payslip/{id}/pdf
+  controller: App\Controller\PayslipController::pdf
+  requirements:
+    id: .+

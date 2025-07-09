@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Salary Slip Details{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1>Salary Slip</h1>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>{{ payslip.employee_name }}</h2>
+        </div>
+        <div class="card-body">
+            <p><strong>Employee ID:</strong> {{ payslip.employee }}</p>
+            <p><strong>Period:</strong> {{ payslip.start_date|date('d/m/Y') }} - {{ payslip.end_date|date('d/m/Y') }}</p>
+            <p><strong>Posting Date:</strong> {{ payslip.posting_date|date('d/m/Y') }}</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Earnings</h3>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for earning in payslip.earnings %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ earning.salary_component }}
+                            <span>{{ earning.amount|number_format(2, '.', ',') }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Deductions</h3>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for deduction in payslip.deductions %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ deduction.salary_component }}
+                            <span>{{ deduction.amount|number_format(2, '.', ',') }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <p class="d-flex justify-content-between"><strong>Gross Pay:</strong> <span>{{ payslip.gross_pay|number_format(2, '.', ',') }}</span></p>
+            <p class="d-flex justify-content-between"><strong>Total Deductions:</strong> <span>{{ payslip.total_deduction|number_format(2, '.', ',') }}</span></p>
+            <hr>
+            <h4 class="d-flex justify-content-between"><strong>Net Pay:</strong> <span>{{ payslip.net_pay|number_format(2, '.', ',') }}</span></h4>
+        </div>
+    </div>
+
+    <a href="{{ path('app_payslip_pdf', {id: payslip.name}) }}" class="btn btn-danger mt-3">Export to PDF</a>
+    <a href="{{ path('app_employee_detail', {id: payslip.employee}) }}" class="btn btn-secondary mt-3">Back to Employee</a>
+</div>
+{% endblock %}

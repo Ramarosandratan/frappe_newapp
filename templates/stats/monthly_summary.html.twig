@@ -1,0 +1,66 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Récapitulatif Mensuel des Salaires{% endblock %}
+
+{% block body %}
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">Récapitulatif Mensuel des Salaires pour {{ monthTitle }}</h1>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <form action="{{ path('app_stats_monthly_summary') }}" method="get" class="form-inline">
+                <div class="form-group mr-3">
+                    <label for="month" class="mr-2">Mois :</label>
+                    <select name="month" id="month" class="form-control" onchange="this.form.submit()">
+                        {% for monthNum, monthName in months %}
+                            <option value="{{ monthNum }}"{{ monthNum == selectedMonth ? ' selected' : '' }}>{{ monthName }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group mr-3">
+                    <label for="year" class="mr-2">Année :</label>
+                    <select name="year" id="year" class="form-control" onchange="this.form.submit()">
+                        {% for year in years %}
+                            <option value="{{ year }}"{{ year == selectedYear ? ' selected' : '' }}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-primary" type="submit">Filtrer</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-hover">
+            <thead class="thead-dark">
+                <tr>
+                    <th scope="col">Employé</th>
+                    {% for component in allComponents %}
+                        <th scope="col" class="text-center">{{ component }}</th>
+                    {% endfor %}
+                    <th scope="col" class="text-right">Total Brut</th>
+                    <th scope="col" class="text-right">Total Déductions</th>
+                    <th scope="col" class="text-right">Total Net</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for employeeName, data in summaryByEmployee %}
+                    <tr>
+                        <td><strong>{{ employeeName }}</strong></td>
+                        {% for component in allComponents %}
+                            <td class="text-center">{{ data.components[component]|default(0)|number_format(2, ',', ' ') }}</td>
+                        {% endfor %}
+                        <td class="text-right font-weight-bold">{{ data.gross_pay|number_format(2, ',', ' ') }}</td>
+                        <td class="text-right text-danger">({{ data.total_deduction|number_format(2, ',', ' ') }})</td>
+                        <td class="text-right font-weight-bold text-success">{{ data.net_pay|number_format(2, ',', ' ') }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="{{ allComponents|length + 4 }}" class="text-center">Aucune donnée à afficher pour ce mois.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

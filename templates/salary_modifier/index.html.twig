@@ -1,0 +1,88 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modification des éléments de salaire{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1>Modification des éléments de salaire</h1>
+    
+    <div class="card">
+        <div class="card-header">
+            <h2>Définir les critères de modification</h2>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="component">Composant de salaire</label>
+                            <select name="component" id="component" class="form-control" required>
+                                <option value="">Sélectionner un composant</option>
+                                {% for component in salaryComponents %}
+                                    <option value="{{ component.name }}">{{ component.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="condition">Condition</label>
+                            <select name="condition" id="condition" class="form-control" required>
+                                {% for key, label in conditions %}
+                                    <option value="{{ key }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="condition_value">Valeur de la condition</label>
+                            <input type="number" name="condition_value" id="condition_value" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="new_value">Nouvelle valeur</label>
+                            <input type="number" name="new_value" id="new_value" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="start_date">Date de début</label>
+                            <input type="date" name="start_date" id="start_date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="end_date">Date de fin</label>
+                            <input type="date" name="end_date" id="end_date" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary">Appliquer les modifications</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="alert alert-info mt-4">
+        <h4>Comment ça marche ?</h4>
+        <p>Cet outil vous permet de modifier en masse les éléments de salaire dans les fiches de paie existantes selon des critères spécifiques.</p>
+        <ul>
+            <li><strong>Composant de salaire</strong> : Sélectionnez le composant que vous souhaitez modifier (ex: Salaire de base, Indemnité, Taxe sociale).</li>
+            <li><strong>Condition</strong> : Définissez la condition que la valeur actuelle doit respecter pour être modifiée.</li>
+            <li><strong>Valeur de la condition</strong> : Entrez la valeur à comparer avec la valeur actuelle.</li>
+            <li><strong>Nouvelle valeur</strong> : Entrez la nouvelle valeur à appliquer si la condition est respectée.</li>
+            <li><strong>Période</strong> : Définissez la période pour laquelle les fiches de paie seront modifiées.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
