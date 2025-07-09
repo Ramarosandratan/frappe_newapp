@@ -68,6 +68,34 @@ services:
       - database_data:/var/lib/postgresql/data:rw
 ```
 
+## ERPNext Integration
+The application integrates with ERPNext through the `ErpNextService` class for:
+- User authentication and management
+- Employee data synchronization
+- Salary structure and payslip operations
+
+### Document Status Management
+The newly implemented `ErpNextImportService` handles:
+- Document dependency management (Company → Employee → Salary Components → Structure → Slips)
+- Automatic document submission for visibility in ERPNext
+- Proper state transitions from Draft to Submitted for critical documents
+- Batch operations for improved performance
+
+### Import Workflow
+1. Company verification/creation
+2. Employee creation with proper status
+3. Salary component creation with abbreviations
+4. Salary structure creation and submission
+5. Structure assignment to employees with proper base amount
+6. Salary slip creation with earnings components and submission
+
+### Critical Fixes for Salary Processing
+- **Salary Structure Assignment**: Now properly sets and validates the base amount
+- **Salary Slip Creation**: Ensures all earnings components are correctly included
+- **Currency Handling**: Explicitly sets currency for salary slips
+- **Amount Validation**: Verifies and updates amounts when documents already exist
+- **Submission Status**: Ensures all documents are properly submitted for visibility
+
 ## Testing
 **Framework**: PHPUnit 12.2
 **Test Location**: tests/
@@ -76,12 +104,3 @@ services:
 ```bash
 php bin/phpunit
 ```
-
-## Integration
-The application integrates with ERPNext through the `ErpNextService` class, which provides methods for:
-- User authentication
-- Employee data management
-- Company and holiday list management
-- Salary structure and payslip operations
-
-The integration uses Symfony's HttpClient to make API calls to the ERPNext instance with token-based authentication.

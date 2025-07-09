@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Import avec gestion des dépendances{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h1>Import avec gestion des dépendances et états des documents</h1>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Workflow d'import complet avec gestion des états</h5>
+        </div>
+        <div class="card-body">
+            <p>Ce formulaire permet d'importer des données vers ERPNext en gérant automatiquement :</p>
+            <ul>
+                <li>Les dépendances entre documents (Company → Employee → Salary Structure → Salary Slip)</li>
+                <li>Les états des documents (Draft/Submitted) pour garantir leur visibilité dans ERPNext</li>
+                <li>La soumission automatique des Salary Structures et Salary Slips</li>
+            </ul>
+        </div>
+    </div>
+    
+    {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    
+    {% if success %}
+        <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+    
+    <form method="post" enctype="multipart/form-data">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Configuration de base</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="company" class="form-label">Nom de l'entreprise</label>
+                            <input type="text" class="form-control" id="company" name="company" value="My Company">
+                            <div class="form-text">Sera créée automatiquement si elle n'existe pas</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="structure" class="form-label">Nom de la structure salariale</label>
+                            <input type="text" class="form-control" id="structure" name="structure" value="gasy1">
+                            <div class="form-text">Sera créée et soumise automatiquement</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Fichiers d'import</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="employee_file" class="form-label">Fichier des employés (CSV)</label>
+                    <input type="file" class="form-control" id="employee_file" name="employee_file">
+                    <div class="form-text">Format: employee_number,first_name,last_name,gender,date_of_joining,date_of_birth</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="component_file" class="form-label">Fichier des composants salariaux (CSV)</label>
+                    <input type="file" class="form-control" id="component_file" name="component_file">
+                    <div class="form-text">Format: salary_component,abbreviation,type,formula</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="slip_file" class="form-label">Fichier des bulletins de salaire (CSV)</label>
+                    <input type="file" class="form-control" id="slip_file" name="slip_file">
+                    <div class="form-text">Format: employee_number,employee_name,start_date,end_date,component_SB,component_IND,...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-lg">Lancer l'import avec gestion des dépendances</button>
+        </div>
+    </form>
+    
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Workflow d'import</h5>
+        </div>
+        <div class="card-body">
+            <ol>
+                <li>Vérification/création de l'entreprise</li>
+                <li>Création des employés</li>
+                <li>Création des composants salariaux</li>
+                <li>Création et soumission de la structure salariale</li>
+                <li>Assignation de la structure aux employés</li>
+                <li>Création et soumission des bulletins de salaire</li>
+            </ol>
+            <p class="mb-0 text-muted">Tous les documents sont automatiquement soumis pour être visibles dans ERPNext.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

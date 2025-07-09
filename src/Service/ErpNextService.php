@@ -884,4 +884,129 @@ class ErpNextService
 
         throw $lastException ?? new \RuntimeException("Failed to submit salary structure assignment after $maxRetries retries");
     }
+
+    /**
+     * Generic method to submit any document type
+     */
+    public function submitDocument(string $doctype, string $name): array
+    {
+        $maxRetries = 3;
+        $retryCount = 0;
+        $lastException = null;
+
+        while ($retryCount < $maxRetries) {
+            try {
+                if ($retryCount > 0) {
+                    $sleepTime = $retryCount * 2;
+                    $this->logger->info("Retrying submitDocument after delay", [
+                        'doctype' => $doctype,
+                        'name' => $name,
+                        'retry' => $retryCount,
+                        'sleep' => $sleepTime
+                    ]);
+                    sleep($sleepTime);
+                }
+
+                $docToSubmit = ['doctype' => $doctype, 'name' => $name];
+                
+                // Si c'est une re-tentative après TimestampMismatchError, on utilise le document rafraîchi
+                if ($retryCount > 0 && $lastException && str_contains($lastException->getMessage(), 'TimestampMismatchError')) {
+                    $latestDoc = $this->getResource($doctype, $name);
+                    if (!$latestDoc) {
+                        $this->logger->error("Failed to refresh document for submission during retry", [
+                            'doctype' => $doctype,
+                            'name' => $name
+                        ]);
+                        throw new \RuntimeException("Failed to refresh document for submission: $doctype/$name");
+                    }
+                    $docToSubmit = array_merge($docToSubmit, $latestDoc);
+                    $this->logger->info("Attempting submit with refreshed document", [
+                        'doctype' => $doctype,
+                        'name' => $name,
+                        'doc' => $docToSubmit
+                    ]);
+                }
+
+                return $this->request('POST', '/api/method/frappe.client.submit', [
+                    'json' => ['doc' => $docToSubmit]
+                ]);
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                $msg = $e->getMessage();
+
+                if (
+                    str_contains($msg, 'already submitted')
+                    || str_contains($msg, 'docstatus')
+                    || str_contains($msg, 'Cannot edit submitted')
+                ) {
+                    $this->logger->info("Document already submitted", [
+                        'doctype' => $doctype,
+                        'name' => $name
+                    ]);
+                    return ['name' => $name, 'already_submitted' => true];
+                }
+
+                if (str_contains($msg, 'TimestampMismatchError')) {
+                    $this->logger->warning("TimestampMismatchError in submitDocument, retrying", [
+                        'doctype' => $doctype,
+                        'name' => $name,
+                        'retry' => $retryCount,
+                        'error' => $msg
+                    ]);
+                    // Ne pas lancer d'exception ici, laisser la boucle retenter
+                } else {
+                    $this->logger->error("Error in submitDocument", [
+                        'doctype' => $doctype,
+                        'name' => $name,
+                        'error' => $msg
+                    ]);
+                    throw $e; // Pour les autres types d'erreurs, on arrête immédiatement
+                }
+            }
+            $retryCount++;
+        }
+
+        $this->logger->error("Max retries exceeded in submitDocument", [
+            'doctype' => $doctype,
+            'name' => $name,
+            'retries' => $maxRetries
+        ]);
+
+        throw $lastException ?? new \RuntimeException("Failed to submit document after $maxRetries retries: $doctype/$name");
+    }
+
+    /**
+     * Generic method to insert a document
+     */
+    public function insertDocument(array $docData): array
+    {
+        return $this->request('POST', '/api/method/frappe.client.insert', [
+            'json' => ['doc' => $docData]
+        ]);
+    }
+
+    /**
+     * Generic method to set a field value on a document
+     */
+    public function setDocumentValue(string $doctype, string $name, string $fieldname, $value): array
+    {
+        return $this->request('POST', '/api/method/frappe.client.set_value', [
+            'json' => [
+                'doctype' => $doctype,
+                'name' => $name,
+                'fieldname' => $fieldname,
+                'value' => $value
+            ]
+        ]);
+    }
+
+    /**
+     * Submit multiple documents in batch
+     */
+    public function submitMultipleDocuments(array $docs): array
+    {
+        return $this->request('POST', '/api/method/frappe.desk.form.save.submit_multiple_docs', [
+            'json' => ['docs' => $docs]
+        ]);
+    }
 }
