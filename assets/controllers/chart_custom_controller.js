@@ -1,11 +1,45 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['canvas'];
-
     connect() {
         console.log('Chart custom controller connected');
-        this.setupChartObserver();
+        // Attendre que le DOM soit complètement chargé
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.initializeChart());
+        } else {
+            this.initializeChart();
+        }
+    }
+
+    initializeChart() {
+        // Essayer d'importer dynamiquement l'API UX Chart.js
+        this.tryImportUXChartjs();
+    }
+
+    async tryImportUXChartjs() {
+        try {
+            console.log('Trying to import UX Chart.js...');
+            const { getComponent } = await import('@symfony/ux-chartjs');
+            console.log('UX Chart.js imported successfully');
+            
+            const canvas = this.element.querySelector('canvas');
+            if (canvas) {
+                console.log('Canvas found, getting chart component...');
+                const chart = await getComponent(canvas);
+                console.log('Chart component retrieved:', chart);
+                this.chart = chart;
+                this.setupCustomFeatures();
+            } else {
+                console.error('No canvas found in element');
+            }
+        } catch (error) {
+            console.error('Failed to import UX Chart.js, falling back:', error);
+            this.fallbackChartDetection();
+        }
+    }
+
+    fallbackChartDetection() {
+        this.waitForUXChart();
     }
 
     disconnect() {
@@ -29,61 +63,67 @@ export default class extends Controller {
         });
     }
 
-    setupChartObserver() {
-        // Observer pour détecter quand le canvas est ajouté au DOM
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const canvas = node.tagName === 'CANVAS' ? node : node.querySelector('canvas');
-                        if (canvas) {
-                            console.log('Canvas detected, waiting for chart...');
-                            this.waitForChart(canvas);
-                        }
-                    }
-                });
-            });
+    waitForUXChart() {
+        // Écouter l'événement personnalisé de Symfony UX Chart.js
+        this.element.addEventListener('chartjs:pre-connect', (event) => {
+            console.log('Chart.js pre-connect event received');
         });
 
-        observer.observe(this.element, { childList: true, subtree: true });
+        this.element.addEventListener('chartjs:connect', (event) => {
+            console.log('Chart.js connect event received', event.detail);
+            this.chart = event.detail.chart;
+            this.setupCustomFeatures();
+        });
 
-        // Vérifier aussi si le canvas existe déjà
-        const existingCanvas = this.element.querySelector('canvas');
-        if (existingCanvas) {
-            console.log('Existing canvas found, waiting for chart...');
-            this.waitForChart(existingCanvas);
-        }
+        // Fallback: essayer de trouver le chart via le contrôleur Symfony UX
+        setTimeout(() => {
+            this.findChartViaController();
+        }, 500);
     }
 
-    waitForChart(canvas) {
-        let attempts = 0;
-        const maxAttempts = 50;
+    findChartViaController() {
+        const chartCanvas = this.element.querySelector('canvas[data-controller*="symfony--ux-chartjs--chart"]');
+        if (chartCanvas) {
+            console.log('Found UX Chart canvas, trying to get controller...');
+            
+            // Essayer d'accéder au contrôleur Stimulus
+            const application = this.application;
+            const chartController = application.getControllerForElementAndIdentifier(chartCanvas, 'symfony--ux-chartjs--chart');
+            
+            if (chartController && chartController.chart) {
+                console.log('Chart found via controller!', chartController.chart);
+                this.chart = chartController.chart;
+                this.setupCustomFeatures();
+                return;
+            }
+        }
 
+        // Dernier recours: attendre et réessayer
+        let attempts = 0;
+        const maxAttempts = 20;
+        
         const checkChart = () => {
             attempts++;
-            console.log(`Attempt ${attempts}: Checking for chart on canvas`);
-
-            if (window.Chart) {
-                // Essayer différentes méthodes pour obtenir le chart
-                let chart = canvas.chart || 
-                           canvas._chart || 
-                           (window.Chart.getChart && window.Chart.getChart(canvas));
-
+            console.log(`Fallback attempt ${attempts}: Looking for chart...`);
+            
+            const canvas = this.element.querySelector('canvas');
+            if (canvas && window.Chart) {
+                const chart = window.Chart.getChart && window.Chart.getChart(canvas);
                 if (chart) {
-                    console.log('Chart found!', chart);
+                    console.log('Chart found via fallback!', chart);
                     this.chart = chart;
                     this.setupCustomFeatures();
                     return;
                 }
             }
-
+            
             if (attempts < maxAttempts) {
-                setTimeout(checkChart, 100);
+                setTimeout(checkChart, 200);
             } else {
-                console.error('Failed to find chart after', maxAttempts, 'attempts');
+                console.error('Failed to find chart after all attempts');
             }
         };
-
+        
         checkChart();
     }
 

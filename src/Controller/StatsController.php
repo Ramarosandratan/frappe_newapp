@@ -165,7 +165,7 @@ class StatsController extends AbstractController
                 $color = $colors[$colorIndex % count($colors)];
                 $dataSet['backgroundColor'] = $color[0];
                 $dataSet['borderColor'] = $color[1];
-                $dataSet['hidden'] = true; // Hide component lines by default
+                $dataSet['hidden'] = false; // Show all component lines by default
                 $datasets[] = $dataSet;
                 $colorIndex++;
             }

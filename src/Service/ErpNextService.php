@@ -329,6 +329,19 @@ class ErpNextService
         );
     }
 
+    public function getActiveEmployees(?string $search = null): array
+    {
+        $filters = [['status', '=', 'Active']];
+        if ($search) {
+            $filters[] = ['employee_name', 'like', "%{$search}%"];
+        }
+        return $this->listResource(
+            'Employee',
+            $filters,
+            ['name','employee_name','company','date_of_joining','date_of_birth','gender','status']
+        );
+    }
+
     public function getEmployeeByNumber(string $employeeNumber): ?array
     {
         $res = $this->listResource('Employee', [['employee_number', '=', $employeeNumber]]);
@@ -619,29 +632,104 @@ class ErpNextService
 
     public function getAllSalarySlips(?int $year = null): array
     {
-        $filters = $year ? [
-            ['start_date', '>=', "{$year}-01-01"],
-            ['start_date', '<=', "{$year}-12-31"],
-        ] : [];
+        $this->logger->info('getAllSalarySlips called', ['year' => $year]);
+        
+        $filters = [];
+        if ($year) {
+            // Essayer plusieurs approches de filtrage par année
+            $filters = [
+                ['start_date', '>=', "{$year}-01-01"],
+                ['start_date', '<=', "{$year}-12-31"],
+            ];
+        }
 
         // Récupérer une liste de fiches de paie avec les champs de base
         $this->logger->info('ERPNextService: Fetching basic salary slips with filters', ['filters' => $filters]);
-        $basicSalarySlips = $this->listResource('Salary Slip', $filters, [
-            'name', 'start_date', 'gross_pay', 'total_deduction', 'net_pay'
-        ], null, 10000);
-        $this->logger->info('ERPNextService: Basic salary slips received', ['count' => count($basicSalarySlips), 'slips_sample' => array_slice($basicSalarySlips, 0, 2)]);
-
-        $detailedSalarySlips = [];
-        foreach ($basicSalarySlips as $slip) {
-            // Pour chaque fiche de paie, récupérer les détails complets, y compris les tables enfants
-            $detailedSlip = $this->getSalarySlipDetails($slip['name']);
-            if ($detailedSlip) {
-                $detailedSalarySlips[] = $detailedSlip;
+        
+        try {
+            $basicSalarySlips = $this->listResource('Salary Slip', $filters, [
+                'name', 'start_date', 'end_date', 'employee', 'employee_name', 'gross_pay', 'total_deduction', 'net_pay'
+            ], 'start_date desc', 10000);
+            
+            $this->logger->info('ERPNextService: Basic salary slips received', [
+                'count' => count($basicSalarySlips), 
+                'slips_sample' => array_slice($basicSalarySlips, 0, 2)
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('ERPNextService: Failed to fetch basic salary slips', [
+                'error' => $e->getMessage(),
+                'filters' => $filters
+            ]);
+            
+            // Fallback: essayer sans filtres si l'année est spécifiée
+            if ($year) {
+                $this->logger->info('ERPNextService: Trying fallback without year filter');
+                try {
+                    $basicSalarySlips = $this->listResource('Salary Slip', [], [
+                        'name', 'start_date', 'end_date', 'employee', 'employee_name', 'gross_pay', 'total_deduction', 'net_pay'
+                    ], 'start_date desc', 10000);
+                    
+                    // Filtrer manuellement par année
+                    $basicSalarySlips = array_filter($basicSalarySlips, function($slip) use ($year) {
+                        $slipYear = date('Y', strtotime($slip['start_date'] ?? ''));
+                        return $slipYear == $year;
+                    });
+                    
+                    $this->logger->info('ERPNextService: Fallback successful, filtered by year', [
+                        'count' => count($basicSalarySlips)
+                    ]);
+                } catch (\Exception $e2) {
+                    $this->logger->error('ERPNextService: Fallback also failed', [
+                        'error' => $e2->getMessage()
+                    ]);
+                    return [];
+                }
             } else {
-                $this->logger->warning('ERPNextService: Failed to get detailed slip for', ['slip_name' => $slip['name']]);
+                return [];
             }
         }
-        $this->logger->info('ERPNextService: Detailed salary slips collected', ['count' => count($detailedSalarySlips), 'slips_sample' => array_slice($detailedSalarySlips, 0, 2)]);
+
+        $detailedSalarySlips = [];
+        $processedCount = 0;
+        $maxToProcess = 100; // Limiter pour éviter les timeouts
+        
+        foreach ($basicSalarySlips as $slip) {
+            if ($processedCount >= $maxToProcess) {
+                $this->logger->info('ERPNextService: Reached processing limit', [
+                    'processed' => $processedCount,
+                    'total' => count($basicSalarySlips)
+                ]);
+                break;
+            }
+            
+            try {
+                // Pour chaque fiche de paie, récupérer les détails complets, y compris les tables enfants
+                $detailedSlip = $this->getSalarySlipDetails($slip['name']);
+                if ($detailedSlip) {
+                    $detailedSalarySlips[] = $detailedSlip;
+                } else {
+                    $this->logger->warning('ERPNextService: Failed to get detailed slip for', ['slip_name' => $slip['name']]);
+                    // Utiliser les données de base si les détails ne sont pas disponibles
+                    $detailedSalarySlips[] = $slip;
+                }
+            } catch (\Exception $e) {
+                $this->logger->warning('ERPNextService: Exception getting detailed slip', [
+                    'slip_name' => $slip['name'],
+                    'error' => $e->getMessage()
+                ]);
+                // Utiliser les données de base en cas d'erreur
+                $detailedSalarySlips[] = $slip;
+            }
+            
+            $processedCount++;
+        }
+        
+        $this->logger->info('ERPNextService: Detailed salary slips collected', [
+            'count' => count($detailedSalarySlips), 
+            'processed' => $processedCount,
+            'total_basic' => count($basicSalarySlips)
+        ]);
+        
         return $detailedSalarySlips;
     }
 
@@ -676,13 +764,69 @@ class ErpNextService
 
     public function getSalarySlipsByPeriod(string $startDate, string $endDate): array
     {
-        $filters = [
-            ['start_date','>=', $startDate],
-            ['end_date','<=', $endDate]
-        ];
-        return $this->listResource('Salary Slip', $filters, [
-            'name','employee','employee_name','start_date','end_date','gross_pay','total_deduction','net_pay'
+        $this->logger->info('getSalarySlipsByPeriod called', [
+            'start_date' => $startDate,
+            'end_date' => $endDate
         ]);
+        
+        // Essayer plusieurs approches de filtrage pour être sûr de récupérer les données
+        $approaches = [
+            // Approche 1: Filtrer par start_date dans la période
+            [
+                ['start_date', '>=', $startDate],
+                ['start_date', '<=', $endDate]
+            ],
+            // Approche 2: Filtrer par end_date dans la période  
+            [
+                ['end_date', '>=', $startDate],
+                ['end_date', '<=', $endDate]
+            ],
+            // Approche 3: Filtrer par chevauchement de période
+            [
+                ['start_date', '<=', $endDate],
+                ['end_date', '>=', $startDate]
+            ]
+        ];
+        
+        $allSlips = [];
+        $slipNames = []; // Pour éviter les doublons
+        
+        foreach ($approaches as $index => $filters) {
+            try {
+                $this->logger->debug("Trying approach " . ($index + 1), ['filters' => $filters]);
+                
+                $slips = $this->listResource('Salary Slip', $filters, [
+                    'name','employee','employee_name','start_date','end_date','gross_pay','total_deduction','net_pay'
+                ]);
+                
+                $this->logger->debug("Approach " . ($index + 1) . " returned " . count($slips) . " slips");
+                
+                foreach ($slips as $slip) {
+                    $slipName = $slip['name'];
+                    if (!in_array($slipName, $slipNames)) {
+                        $slipNames[] = $slipName;
+                        $allSlips[] = $slip;
+                    }
+                }
+                
+                // Si on a trouvé des résultats avec la première approche, on peut s'arrêter
+                if (!empty($slips) && $index === 0) {
+                    break;
+                }
+                
+            } catch (\Exception $e) {
+                $this->logger->warning("Approach " . ($index + 1) . " failed", [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+        
+        $this->logger->info('getSalarySlipsByPeriod result', [
+            'total_slips_found' => count($allSlips),
+            'unique_slips' => count($slipNames)
+        ]);
+        
+        return $allSlips;
     }
 
     public function getEmployeeSalarySlipsByPeriod(string $employeeId, ?string $startDate = null, ?string $endDate = null): array
@@ -759,6 +903,207 @@ class ErpNextService
         return $this->request('POST', '/api/method/frappe.client.save', [
             'json' => ['doc' => $data]
         ]);
+    }
+
+    /**
+     * Supprime une fiche de paie existante
+     */
+    public function deleteSalarySlip(string $salarySlipName): bool
+    {
+        try {
+            $this->logger->info("Attempting to delete salary slip", [
+                'salary_slip' => $salarySlipName
+            ]);
+
+            // D'abord, récupérer les détails de la fiche pour connaître son statut
+            try {
+                $slipDetails = $this->request('GET', '/api/resource/Salary Slip/' . urlencode($salarySlipName));
+                $docstatus = $slipDetails['data']['docstatus'] ?? 0;
+                
+                $this->logger->info("Salary slip details retrieved", [
+                    'salary_slip' => $salarySlipName,
+                    'docstatus' => $docstatus
+                ]);
+
+                // Si la fiche est soumise (docstatus = 1), l'annuler d'abord
+                if ($docstatus == 1) {
+                    try {
+                        $this->request('POST', '/api/method/frappe.client.cancel_doc', [
+                            'json' => [
+                                'doctype' => 'Salary Slip',
+                                'name' => $salarySlipName
+                            ]
+                        ]);
+                        $this->logger->info("Salary slip cancelled successfully", [
+                            'salary_slip' => $salarySlipName
+                        ]);
+                        
+                        // Attendre un peu pour que l'annulation soit prise en compte
+                        sleep(1);
+                    } catch (\Exception $e) {
+                        $this->logger->warning("Failed to cancel salary slip", [
+                            'salary_slip' => $salarySlipName,
+                            'error' => $e->getMessage()
+                        ]);
+                        // Continuer quand même pour essayer la suppression
+                    }
+                }
+            } catch (\Exception $e) {
+                $this->logger->warning("Could not retrieve salary slip details", [
+                    'salary_slip' => $salarySlipName,
+                    'error' => $e->getMessage()
+                ]);
+                // Continuer quand même
+            }
+
+            // Ensuite, supprimer la fiche
+            try {
+                $this->request('DELETE', '/api/resource/Salary Slip/' . urlencode($salarySlipName));
+                $this->logger->info("Salary slip deleted successfully", [
+                    'salary_slip' => $salarySlipName
+                ]);
+                return true;
+            } catch (\Exception $e) {
+                // Si la suppression directe échoue, essayer avec l'API frappe.client.delete
+                $this->logger->info("Direct delete failed, trying frappe.client.delete", [
+                    'salary_slip' => $salarySlipName,
+                    'error' => $e->getMessage()
+                ]);
+                
+                try {
+                    $this->request('POST', '/api/method/frappe.client.delete', [
+                        'json' => [
+                            'doctype' => 'Salary Slip',
+                            'name' => $salarySlipName
+                        ]
+                    ]);
+                    $this->logger->info("Salary slip deleted successfully via frappe.client.delete", [
+                        'salary_slip' => $salarySlipName
+                    ]);
+                    return true;
+                } catch (\Exception $e2) {
+                    $this->logger->error("All delete methods failed", [
+                        'salary_slip' => $salarySlipName,
+                        'direct_delete_error' => $e->getMessage(),
+                        'client_delete_error' => $e2->getMessage()
+                    ]);
+                    return false;
+                }
+            }
+            
+        } catch (\Exception $e) {
+            $this->logger->error("Failed to delete salary slip", [
+                'salary_slip' => $salarySlipName,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Supprime toutes les fiches de paie existantes pour un employé sur une période
+     */
+    public function deleteExistingSalarySlips(string $employeeId, string $startDate, string $endDate): array
+    {
+        $deletedSlips = [];
+        $errors = [];
+
+        try {
+            // Récupérer les fiches existantes pour cette période
+            $existingSlips = $this->getSalarySlips([
+                'employee' => $employeeId,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+            ]);
+
+            $this->logger->info("Found existing salary slips to delete", [
+                'employee' => $employeeId,
+                'period' => "$startDate to $endDate",
+                'slips_count' => count($existingSlips),
+                'slips' => array_column($existingSlips, 'name')
+            ]);
+
+            foreach ($existingSlips as $slip) {
+                $slipName = $slip['name'];
+                
+                // Essayer plusieurs méthodes de suppression
+                $deleted = false;
+                
+                // Méthode 1: Suppression directe
+                if ($this->deleteSalarySlip($slipName)) {
+                    $deletedSlips[] = $slipName;
+                    $deleted = true;
+                } else {
+                    // Méthode 2: Essayer d'annuler puis supprimer avec une approche différente
+                    try {
+                        $this->logger->info("Trying alternative deletion method", [
+                            'salary_slip' => $slipName
+                        ]);
+                        
+                        // Récupérer les détails de la fiche
+                        $slipDetails = $this->request('GET', '/api/resource/Salary Slip/' . urlencode($slipName));
+                        
+                        // Si la fiche est soumise, l'annuler
+                        if (isset($slipDetails['data']['docstatus']) && $slipDetails['data']['docstatus'] == 1) {
+                            $this->request('POST', '/api/method/frappe.client.cancel_doc', [
+                                'json' => [
+                                    'doctype' => 'Salary Slip',
+                                    'name' => $slipName
+                                ]
+                            ]);
+                            sleep(1); // Attendre que l'annulation soit prise en compte
+                        }
+                        
+                        // Essayer de supprimer avec l'API frappe.desk.form.utils.delete_doc
+                        $this->request('POST', '/api/method/frappe.desk.form.utils.delete_doc', [
+                            'json' => [
+                                'doctype' => 'Salary Slip',
+                                'name' => $slipName
+                            ]
+                        ]);
+                        
+                        $deletedSlips[] = $slipName;
+                        $deleted = true;
+                        
+                        $this->logger->info("Alternative deletion method succeeded", [
+                            'salary_slip' => $slipName
+                        ]);
+                        
+                    } catch (\Exception $e) {
+                        $this->logger->warning("Alternative deletion method failed", [
+                            'salary_slip' => $slipName,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+                
+                if (!$deleted) {
+                    $errors[] = "Failed to delete salary slip: $slipName";
+                    $this->logger->error("All deletion methods failed", [
+                        'salary_slip' => $slipName
+                    ]);
+                }
+            }
+
+            $this->logger->info("Completed deletion of existing salary slips", [
+                'employee' => $employeeId,
+                'period' => "$startDate to $endDate",
+                'deleted_count' => count($deletedSlips),
+                'error_count' => count($errors)
+            ]);
+
+        } catch (\Exception $e) {
+            $errors[] = "Error retrieving existing salary slips: " . $e->getMessage();
+            $this->logger->error("Error in deleteExistingSalarySlips", [
+                'employee' => $employeeId,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        return [
+            'deleted' => $deletedSlips,
+            'errors' => $errors
+        ];
     }
 
     /**

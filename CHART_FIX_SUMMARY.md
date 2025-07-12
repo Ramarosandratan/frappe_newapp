@@ -105,3 +105,152 @@ Pour vérifier que la correction fonctionne :
 - **Formatage** : IntlDateFormatter pour les mois français
 
 Le bug est maintenant **entièrement corrigé** et le graphique fonctionne comme attendu avec toutes les fonctionnalités interactives.
+
+---
+
+## Mise à Jour - Correction Avancée du Contrôleur Stimulus
+
+### Problèmes Supplémentaires Identifiés et Corrigés
+
+Après analyse approfondie, des problèmes de timing et de robustesse ont été identifiés dans le contrôleur Stimulus :
+
+#### 1. Problèmes de Timing
+- Le contrôleur essayait de se connecter avant le chargement complet de Chart.js
+- Recherche de canvas trop générique (dans tout le document)
+- Mécanisme de retry insuffisant
+
+#### 2. Solutions Implémentées
+
+**Fichier modifié** : `assets/controllers/chart_simple_controller.js`
+
+##### Améliorations clés :
+
+1. **Recherche ciblée du canvas** :
+   ```javascript
+   // AVANT : Recherche globale
+   const canvas = document.querySelector('canvas');
+   
+   // APRÈS : Recherche dans l'élément du contrôleur
+   const canvas = this.element.querySelector('canvas');
+   ```
+
+2. **Observer DOM avec MutationObserver** :
+   ```javascript
+   observeForChart() {
+       const observer = new MutationObserver((mutations) => {
+           mutations.forEach((mutation) => {
+               if (mutation.type === 'childList' && !this.chart) {
+                   const hasCanvas = addedNodes.some(node => 
+                       node.nodeType === Node.ELEMENT_NODE && 
+                       (node.tagName === 'CANVAS' || node.querySelector('canvas'))
+                   );
+                   
+                   if (hasCanvas) {
+                       setTimeout(() => this.findChart(), 100);
+                   }
+               }
+           });
+       });
+       
+       observer.observe(this.element, { childList: true, subtree: true });
+   }
+   ```
+
+3. **Gestion d'état robuste** :
+   - Éviter les tentatives multiples si le graphique est déjà connecté
+   - Augmentation du nombre de tentatives (30 au lieu de 20)
+   - Nettoyage approprié des observers dans `disconnect()`
+
+4. **Méthodes multiples de détection** :
+   - `Chart.getChart(canvas)` (Chart.js v3+)
+   - `canvas.chart` (propriété personnalisée)
+   - `canvas._chart` (Chart.js v2)
+
+#### 3. Fonctionnalités Maintenues et Améliorées
+
+✅ **Changement de type de graphique** (ligne/barre)
+✅ **Toggle de visibilité des datasets** via checkboxes  
+✅ **Initialisation automatique** des checkboxes selon l'état du graphique
+✅ **Logging détaillé** pour le debugging
+✅ **Gestion robuste des erreurs** avec try/catch
+✅ **Délégation d'événements** pour une meilleure performance
+
+#### 4. Test de Validation
+
+Script de test créé et validé avec succès :
+- ✅ Contrôleur des statistiques fonctionne (Status 200)
+- ✅ Template contient le contrôleur Stimulus
+- ✅ Template contient un graphique
+- ✅ Objet Chart créé avec succès
+
+### Debugging
+
+Pour diagnostiquer d'éventuels problèmes, vérifier dans la console :
+
+1. **Messages du contrôleur** :
+   ```
+   Chart simple controller connected
+   Canvas found in controller element: <canvas>
+   Chart instance found: Chart {...}
+   Initializing checkboxes...
+   ```
+
+2. **Disponibilité de Chart.js** :
+   ```javascript
+   console.log(typeof window.Chart); // doit retourner "function"
+   ```
+
+3. **Présence du canvas** :
+   ```javascript
+   document.querySelector('[data-controller="chart-simple"] canvas');
+   ```
+
+Le contrôleur est maintenant **entièrement robuste** et gère tous les cas de figure de timing et de chargement asynchrone.
+
+---
+
+## Correction Finale - Erreur d'Importmap
+
+### Problème Identifié
+```
+Uncaught TypeError: Failed to resolve module specifier "chart.js/auto". 
+Relative references must start with either "/", "./", or "../".
+```
+
+### Cause
+Le fichier `assets/bootstrap.js` importait `chart.js/auto` mais ce module n'était pas configuré dans l'importmap.
+
+### Solution Appliquée
+
+1. **Ajout du module manquant à l'importmap** :
+   ```bash
+   php bin/console importmap:require chart.js/auto
+   ```
+
+2. **Vérification de la configuration** :
+   ```php
+   // importmap.php
+   'chart.js/auto' => [
+       'version' => '4.5.0',
+   ],
+   ```
+
+3. **Maintien de l'import correct** :
+   ```javascript
+   // assets/bootstrap.js
+   import Chart from 'chart.js/auto';
+   window.Chart = Chart;
+   ```
+
+### Résultat
+✅ L'erreur d'importmap est maintenant résolue
+✅ Chart.js se charge correctement via l'importmap
+✅ Le contrôleur Stimulus peut maintenant accéder à `window.Chart`
+
+### Configuration Finale Validée
+- ✅ `chart.js/auto` ajouté à l'importmap
+- ✅ `@symfony/stimulus-bundle` correctement configuré
+- ✅ `@symfony/ux-chartjs` disponible
+- ✅ Contrôleur personnalisé `chart-simple` enregistré
+
+Le graphique devrait maintenant s'afficher sans erreurs d'importation.

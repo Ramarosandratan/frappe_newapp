@@ -1,13 +1,166 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Salary Generator{% endblock %}
+{% block title %}Génération des Salaires{% endblock %}
 
 {% block body %}
-<div class="container">
-    <h1>Salary Generator</h1>
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h1 class="card-title mb-0">
+                        <i class="fas fa-calculator"></i> Génération des Salaires
+                    </h1>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> Instructions</h5>
+                        <ul class="mb-0">
+                            <li><strong>Date début / fin :</strong> Définit la période pour laquelle générer les salaires</li>
+                            <li><strong>Salaire de base :</strong> Si vide, le dernier salaire avant la date début sera utilisé comme base</li>
+                            <li><strong>Écraser les valeurs existantes :</strong> Remplace les fiches de paie existantes pour cette période</li>
+                            <li><strong>Utiliser la moyenne :</strong> Calcule la moyenne des 3 dernières fiches de paie comme base</li>
+                        </ul>
+                    </div>
 
-    {{ form_start(form) }}
-    {{ form_widget(form) }}
-    {{ form_end(form) }}
+                    {{ form_start(form, {'attr': {'class': 'needs-validation', 'novalidate': true}}) }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                {{ form_label(form.startDate, null, {'label_attr': {'class': 'form-label fw-bold'}}) }}
+                                {{ form_widget(form.startDate) }}
+                                {{ form_help(form.startDate) }}
+                                <div class="invalid-feedback">
+                                    {{ form_errors(form.startDate) }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                {{ form_label(form.endDate, null, {'label_attr': {'class': 'form-label fw-bold'}}) }}
+                                {{ form_widget(form.endDate) }}
+                                {{ form_help(form.endDate) }}
+                                <div class="invalid-feedback">
+                                    {{ form_errors(form.endDate) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        {{ form_label(form.baseSalary, null, {'label_attr': {'class': 'form-label fw-bold'}}) }}
+                        {{ form_widget(form.baseSalary) }}
+                        <div class="form-text">{{ form_help(form.baseSalary) }}</div>
+                        <div class="invalid-feedback">
+                            {{ form_errors(form.baseSalary) }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                {{ form_widget(form.overwrite) }}
+                                {{ form_label(form.overwrite, null, {'label_attr': {'class': 'form-check-label'}}) }}
+                                <div class="form-text">{{ form_help(form.overwrite) }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                {{ form_widget(form.useAverage) }}
+                                {{ form_label(form.useAverage, null, {'label_attr': {'class': 'form-check-label'}}) }}
+                                <div class="form-text">{{ form_help(form.useAverage) }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form_widget(form.submit) }}
+                    </div>
+
+                    {{ form_end(form) }}
+                </div>
+            </div>
+
+            {% if app.session.flashbag.peek('success') %}
+                <div class="alert alert-success mt-3">
+                    <i class="fas fa-check-circle"></i>
+                    {% for message in app.session.flashbag.get('success') %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if app.session.flashbag.peek('info') %}
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    {% for message in app.session.flashbag.get('info') %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if app.session.flashbag.peek('warning') %}
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {% for message in app.session.flashbag.get('warning') %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if app.session.flashbag.peek('error') %}
+                <div class="alert alert-danger mt-3">
+                    <i class="fas fa-times-circle"></i>
+                    {% for message in app.session.flashbag.get('error') %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Validation du formulaire
+            const form = document.querySelector('.needs-validation');
+            if (form) {
+                form.addEventListener('submit', function(event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                });
+            }
+
+            // Logique pour les options mutuellement exclusives
+            const overwriteCheckbox = document.querySelector('#salary_generator_overwrite');
+            const useAverageCheckbox = document.querySelector('#salary_generator_useAverage');
+            const baseSalaryInput = document.querySelector('#salary_generator_baseSalary');
+
+            if (useAverageCheckbox && baseSalaryInput) {
+                useAverageCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        baseSalaryInput.disabled = true;
+                        baseSalaryInput.value = '';
+                        baseSalaryInput.closest('.form-group').classList.add('text-muted');
+                    } else {
+                        baseSalaryInput.disabled = false;
+                        baseSalaryInput.closest('.form-group').classList.remove('text-muted');
+                    }
+                });
+
+                // Initialiser l'état au chargement
+                if (useAverageCheckbox.checked) {
+                    baseSalaryInput.disabled = true;
+                    baseSalaryInput.closest('.form-group').classList.add('text-muted');
+                }
+            }
+        });
+    </script>
 {% endblock %}
