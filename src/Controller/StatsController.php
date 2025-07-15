@@ -41,6 +41,7 @@ class StatsController extends AbstractController
                 'month' => $monthKey,
                 'totalGrossPay' => 0,
                 'totalNetPay' => 0,
+                'totalDeduction' => 0,
                 'components' => [],
             ];
         }
@@ -56,12 +57,14 @@ class StatsController extends AbstractController
                     'month' => $month,
                     'totalGrossPay' => 0,
                     'totalNetPay' => 0,
+                    'totalDeduction' => 0,
                     'components' => [],
                 ];
             }
 
             $monthlyEvolutionData[$month]['totalGrossPay'] += $slip['gross_pay'];
             $monthlyEvolutionData[$month]['totalNetPay'] += $slip['net_pay'];
+            $monthlyEvolutionData[$month]['totalDeduction'] += $slip['total_deduction'];
 
             // Process earnings
             if (isset($slip['earnings']) && is_array($slip['earnings'])) {
@@ -95,10 +98,29 @@ class StatsController extends AbstractController
         ksort($monthlyEvolutionData); // Sort by month (YYYY-MM)
         ksort($allComponents); // Sort components alphabetically
 
+        // Vérification de cohérence des calculs
+        foreach ($monthlyEvolutionData as $month => &$data) {
+            $calculatedDeduction = $data['totalGrossPay'] - $data['totalNetPay'];
+            
+            // Si la différence est significative (plus de 1 Ar), log un avertissement
+            if (abs($data['totalDeduction'] - $calculatedDeduction) > 1) {
+                $this->logger->warning('Inconsistency in salary calculations', [
+                    'month' => $month,
+                    'stored_deduction' => $data['totalDeduction'],
+                    'calculated_deduction' => $calculatedDeduction,
+                    'gross_pay' => $data['totalGrossPay'],
+                    'net_pay' => $data['totalNetPay']
+                ]);
+                
+                // Utiliser la valeur calculée si elle semble plus cohérente
+                $data['totalDeduction'] = $calculatedDeduction;
+            }
+        }
+
         // Check if we have any data
         $hasData = false;
         foreach ($monthlyEvolutionData as $data) {
-            if ($data['totalGrossPay'] > 0 || $data['totalNetPay'] > 0) {
+            if ($data['totalGrossPay'] > 0 || $data['totalNetPay'] > 0 || $data['totalDeduction'] > 0) {
                 $hasData = true;
                 break;
             }
@@ -232,6 +254,18 @@ class StatsController extends AbstractController
     public function monthlyDetail(string $startDate, string $endDate): Response
     {
         $salarySlips = $this->erpNextService->getSalarySlipsByPeriod($startDate, $endDate);
+
+        // Log des données récupérées pour diagnostic
+        $this->logger->info("StatsController: Retrieved salary slips for monthly detail", [
+            'period' => $startDate . ' to ' . $endDate,
+            'count' => count($salarySlips),
+            'sample_slip' => !empty($salarySlips) ? [
+                'name' => $salarySlips[0]['name'] ?? 'Unknown',
+                'gross_pay' => $salarySlips[0]['gross_pay'] ?? 'Not set',
+                'net_pay' => $salarySlips[0]['net_pay'] ?? 'Not set',
+                'total_deduction' => $salarySlips[0]['total_deduction'] ?? 'Not set'
+            ] : 'No slips found'
+        ]);
 
         $monthFormatter = new \IntlDateFormatter('fr_FR', \IntlDateFormatter::NONE, \IntlDateFormatter::NONE, null, null, 'MMMM yyyy');
         $monthTitle = ucfirst($monthFormatter->format(new \DateTime($startDate)));

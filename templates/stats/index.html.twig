@@ -67,7 +67,7 @@
                             <td class="text-center">{{ data.components[component]|default(0)|number_format(2, ',', ' ') }}</td>
                         {% endfor %}
                         <td class="text-right font-weight-bold">{{ data.totalGrossPay|number_format(2, ',', ' ') }}</td>
-                        <td class="text-right text-danger">({{ (data.totalGrossPay - data.totalNetPay)|number_format(2, ',', ' ') }})</td>
+                        <td class="text-right text-danger">({{ data.totalDeduction|number_format(2, ',', ' ') }})</td>
                         <td class="text-right font-weight-bold text-success">{{ data.totalNetPay|number_format(2, ',', ' ') }}</td>
                     </tr>
                 {% else %}

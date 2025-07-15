@@ -52,6 +52,40 @@
                 </div>
                 
                 <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="form-check">
+                            <input type="checkbox" name="use_monthly_percentages" id="use_monthly_percentages" class="form-check-input" value="1">
+                            <label class="form-check-label" for="use_monthly_percentages">
+                                Utiliser des pourcentages mensuels personnalisés
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="monthly_percentages_section" class="row mb-3" style="display: none;">
+                    <div class="col-md-12">
+                        <h5>Pourcentages mensuels (%)</h5>
+                        <div class="row">
+                            {% for month, monthName in monthNames %}
+                                <div class="col-md-3 mb-2">
+                                    <label for="monthly_percentage_{{ month }}" class="form-label">{{ monthName }}</label>
+                                    <input type="number" 
+                                           name="monthly_percentages[{{ month }}]" 
+                                           id="monthly_percentage_{{ month }}" 
+                                           class="form-control" 
+                                           step="0.01" 
+                                           placeholder="0.00">
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <small class="form-text text-muted">
+                            Entrez les pourcentages d'augmentation/réduction pour chaque mois. 
+                            Exemple: 5 pour +5%, -10 pour -10%. Laissez vide pour 0%.
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="form-group">
                             <label for="start_date">Date de début</label>
@@ -80,9 +114,99 @@
             <li><strong>Composant de salaire</strong> : Sélectionnez le composant que vous souhaitez modifier (ex: Salaire de base, Indemnité, Taxe sociale).</li>
             <li><strong>Condition</strong> : Définissez la condition que la valeur actuelle doit respecter pour être modifiée.</li>
             <li><strong>Valeur de la condition</strong> : Entrez la valeur à comparer avec la valeur actuelle.</li>
-            <li><strong>Nouvelle valeur</strong> : Entrez la nouvelle valeur à appliquer si la condition est respectée.</li>
+            <li><strong>Nouvelle valeur</strong> : Entrez la nouvelle valeur à appliquer si la condition est respectée (ignoré si les pourcentages mensuels sont utilisés).</li>
+            <li><strong>Pourcentages mensuels</strong> : Cochez cette option pour appliquer des pourcentages d'augmentation/réduction différents selon le mois de la fiche de paie.</li>
             <li><strong>Période</strong> : Définissez la période pour laquelle les fiches de paie seront modifiées.</li>
         </ul>
+        <div class="alert alert-warning mt-3">
+            <strong>Fonctionnalité des pourcentages mensuels :</strong>
+            <p>Lorsque vous activez les pourcentages mensuels, le système appliquera automatiquement le pourcentage correspondant au mois de chaque fiche de paie. Par exemple :</p>
+            <ul>
+                <li>Une fiche de paie de janvier utilisera le pourcentage défini pour janvier</li>
+                <li>Une fiche de paie de février utilisera le pourcentage défini pour février</li>
+                <li>Si aucun pourcentage n'est défini pour un mois, la valeur originale sera conservée</li>
+            </ul>
+            <p>Les pourcentages sont sauvegardés en base de données et peuvent être réutilisés pour le même composant.</p>
+        </div>
+        
+        <div class="alert alert-info mt-3">
+            <strong>🔧 Améliorations récentes :</strong>
+            <p>Le système a été amélioré pour une meilleure fiabilité :</p>
+            <ul>
+                <li><strong>Gestion des fiches annulées :</strong> Les fiches de paie annulées sont automatiquement ignorées</li>
+                <li><strong>Validation des totaux :</strong> Les totaux sont vérifiés et corrigés automatiquement avant sauvegarde</li>
+                <li><strong>Pourcentages sécurisés :</strong> Les pourcentages sont limités entre -100% et +1000% pour éviter les erreurs</li>
+                <li><strong>Gestion d'erreurs améliorée :</strong> Les erreurs sont mieux gérées et n'interrompent plus le traitement des autres fiches</li>
+                <li><strong>Logs détaillés :</strong> Toutes les opérations sont loggées pour faciliter le débogage</li>
+            </ul>
+        </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const useMonthlyPercentagesCheckbox = document.getElementById('use_monthly_percentages');
+    const monthlyPercentagesSection = document.getElementById('monthly_percentages_section');
+    const newValueInput = document.getElementById('new_value');
+    const conditionSelect = document.getElementById('condition');
+    const conditionValueInput = document.getElementById('condition_value');
+    const componentSelect = document.getElementById('component');
+
+    // Gérer l'affichage de la section des pourcentages mensuels
+    useMonthlyPercentagesCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            monthlyPercentagesSection.style.display = 'block';
+            newValueInput.required = false;
+            newValueInput.disabled = true;
+            conditionSelect.required = false;
+            conditionSelect.disabled = true;
+            conditionValueInput.required = false;
+            conditionValueInput.disabled = true;
+        } else {
+            monthlyPercentagesSection.style.display = 'none';
+            newValueInput.required = true;
+            newValueInput.disabled = false;
+            conditionSelect.required = true;
+            conditionSelect.disabled = false;
+            conditionValueInput.required = true;
+            conditionValueInput.disabled = false;
+        }
+    });
+
+    // Charger les pourcentages existants quand le composant change
+    componentSelect.addEventListener('change', function() {
+        const component = this.value;
+        if (component && useMonthlyPercentagesCheckbox.checked) {
+            loadExistingPercentages(component);
+        }
+    });
+
+    // Charger les pourcentages existants quand la case est cochée
+    useMonthlyPercentagesCheckbox.addEventListener('change', function() {
+        const component = componentSelect.value;
+        if (this.checked && component) {
+            loadExistingPercentages(component);
+        }
+    });
+
+    function loadExistingPercentages(component) {
+        fetch(`/salary/modifier/percentages/${encodeURIComponent(component)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remplir les champs avec les pourcentages existants
+                    for (let month = 1; month <= 12; month++) {
+                        const input = document.getElementById(`monthly_percentage_${month}`);
+                        if (input) {
+                            input.value = data.percentages[month] || '';
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des pourcentages:', error);
+            });
+    }
+});
+</script>
 {% endblock %}

@@ -7,14 +7,40 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 
 /**
- * Optimized ERPNext Service
+ * Service optimisé pour l'intégration avec ERPNext
+ * 
+ * Ce service gère toutes les communications avec l'API ERPNext :
+ * - Authentification par token API
+ * - Gestion des erreurs et exceptions
+ * - Opérations CRUD sur les documents ERPNext
+ * - Gestion spécifique des fiches de paie et composants de salaire
+ * 
+ * Fonctionnalités principales :
+ * - Récupération et modification des fiches de paie
+ * - Gestion des statuts de documents (Draft/Submitted/Cancelled)
+ * - Validation des données avant sauvegarde
+ * - Logs détaillés pour le débogage
  */
 class ErpNextService
 {
+    /** @var string URL de base de l'API ERPNext */
     private string $apiBase;
+    
+    /** @var string Clé API pour l'authentification */
     private string $apiKey;
+    
+    /** @var string Secret API pour l'authentification */
     private string $apiSecret;
 
+    /**
+     * Constructeur - Configuration de l'API ERPNext
+     * 
+     * @param HttpClientInterface $client Client HTTP Symfony
+     * @param LoggerInterface $logger Logger pour tracer les opérations
+     * @param string $apiBase URL de base de l'API ERPNext
+     * @param string $apiKey Clé API
+     * @param string $apiSecret Secret API
+     */
     public function __construct(
         private readonly HttpClientInterface $client,
         private readonly LoggerInterface $logger,
@@ -27,13 +53,25 @@ class ErpNextService
         $this->apiSecret = $apiSecret;
     }
 
-    // ------------------ CORE API REQUESTS ----------------------
+    // ================== MÉTHODES PRINCIPALES D'API ==================
 
+    /**
+     * Méthode privée pour effectuer des requêtes HTTP vers l'API ERPNext
+     * 
+     * Gère l'authentification, les headers, et le traitement des réponses.
+     * Inclut la gestion d'erreurs spécifique à ERPNext.
+     * 
+     * @param string $method Méthode HTTP (GET, POST, PUT, DELETE)
+     * @param string $uri URI relative de l'API
+     * @param array $options Options de la requête (headers, query, json, etc.)
+     * @return array Réponse décodée de l'API
+     * @throws \RuntimeException En cas d'erreur API
+     */
     private function request(string $method, string $uri, array $options = []): array
     {
         $fullUrl = $this->apiBase . $uri;
 
-        // Explicit header merge (not recursive!)
+        // Fusion explicite des headers (pas récursive pour éviter les conflits)
         $userHeaders = $options['headers'] ?? [];
         $options['headers'] = array_merge([
             'Authorization' => 'token ' . $this->apiKey . ':' . $this->apiSecret,
@@ -41,7 +79,8 @@ class ErpNextService
             'Content-Type' => 'application/json',
         ], $userHeaders);
 
-        unset($options['headers']['Content-Length']); // Let client set this
+        // Laisser le client HTTP gérer Content-Length automatiquement
+        unset($options['headers']['Content-Length']);
 
         try {
             $response = $this->client->request($method, $fullUrl, $options);
@@ -900,9 +939,34 @@ class ErpNextService
     public function updateSalarySlip(array $data): array
     {
         $data['doctype'] = $data['doctype'] ?? 'Salary Slip';
-        return $this->request('POST', '/api/method/frappe.client.save', [
+        
+        $this->logger->info("Updating salary slip in ERPNext", [
+            'slip_name' => $data['name'] ?? 'Unknown',
+            'gross_pay' => $data['gross_pay'] ?? 'Not set',
+            'total_deduction' => $data['total_deduction'] ?? 'Not set',
+            'net_pay' => $data['net_pay'] ?? 'Not set',
+            'original_docstatus' => $data['docstatus'] ?? 'Not set'
+        ]);
+        
+        // SOLUTION SIMPLE: Toujours forcer le statut à draft pour permettre la modification
+        $data['docstatus'] = 0;
+        
+        // SOLUTION SIMPLE: Sauvegarder directement en draft sans soumission
+        // Validation des données avant sauvegarde
+        $this->validateSalarySlipData($data);
+        
+        $result = $this->request('POST', '/api/method/frappe.client.save', [
             'json' => ['doc' => $data]
         ]);
+        
+        $this->logger->info("Salary slip saved successfully in draft", [
+            'slip_name' => $data['name'] ?? 'Unknown',
+            'final_docstatus' => 0,
+            'gross_pay' => $data['gross_pay'] ?? 'Not set',
+            'net_pay' => $data['net_pay'] ?? 'Not set'
+        ]);
+        
+        return $result;
     }
 
     /**
@@ -1586,6 +1650,231 @@ class ErpNextService
         ]);
 
         throw $lastException ?? new \RuntimeException("Failed to submit document after $maxRetries retries: $doctype/$name");
+    }
+
+    /**
+     * Submit a salary slip with retry logic
+     */
+    public function submitSalarySlip(string $name): array
+    {
+        $maxRetries = 3;
+        $retryCount = 0;
+        $lastException = null;
+
+        while ($retryCount < $maxRetries) {
+            try {
+                if ($retryCount > 0) {
+                    $sleepTime = $retryCount * 2;
+                    $this->logger->info("Retrying submitSalarySlip after delay", [
+                        'name' => $name,
+                        'retry' => $retryCount,
+                        'sleep' => $sleepTime
+                    ]);
+                    sleep($sleepTime);
+                }
+
+                // Récupérer le document complet pour préserver les totaux calculés
+                $latestDoc = $this->getResource('Salary Slip', $name);
+                if (!$latestDoc) {
+                    $this->logger->error("Failed to get salary slip for submission", ['name' => $name]);
+                    throw new \RuntimeException("Failed to get salary slip for submission: $name");
+                }
+                
+                // S'assurer que les totaux sont corrects avant soumission
+                $this->ensureSalarySlipTotals($latestDoc);
+                
+                $docToSubmit = array_merge(['doctype' => 'Salary Slip', 'name' => $name], $latestDoc);
+                
+                $this->logger->info("Submitting salary slip with preserved totals", [
+                    'name' => $name, 
+                    'gross_pay' => $latestDoc['gross_pay'] ?? 'not set',
+                    'total_deduction' => $latestDoc['total_deduction'] ?? 'not set',
+                    'net_pay' => $latestDoc['net_pay'] ?? 'not set'
+                ]);
+
+                return $this->request('POST', '/api/method/frappe.client.submit', [
+                    'json' => ['doc' => $docToSubmit]
+                ]);
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                $msg = $e->getMessage();
+
+                if (
+                    str_contains($msg, 'already submitted')
+                    || str_contains($msg, 'docstatus')
+                    || str_contains($msg, 'Cannot edit submitted')
+                ) {
+                    $this->logger->info("Salary slip already submitted", ['name' => $name]);
+                    return ['name' => $name, 'already_submitted' => true];
+                }
+
+                if (str_contains($msg, 'TimestampMismatchError')) {
+                    $this->logger->warning("TimestampMismatchError in submitSalarySlip, retrying", [
+                        'name' => $name,
+                        'retry' => $retryCount,
+                        'error' => $msg
+                    ]);
+                    // Ne pas lancer d'exception ici, laisser la boucle retenter
+                } else {
+                    $this->logger->error("Error in submitSalarySlip", [
+                        'name' => $name,
+                        'error' => $msg
+                    ]);
+                    throw $e; // Pour les autres types d'erreurs, on arrête immédiatement
+                }
+            }
+            $retryCount++;
+        }
+
+        $this->logger->error("Max retries exceeded in submitSalarySlip", [
+            'name' => $name,
+            'retries' => $maxRetries
+        ]);
+
+        throw $lastException ?? new \RuntimeException("Failed to submit salary slip after $maxRetries retries");
+    }
+
+    /**
+     * Valide les données d'une fiche de paie avant sauvegarde
+     */
+    private function validateSalarySlipData(array &$data): void
+    {
+        // S'assurer que les champs obligatoires sont présents
+        $requiredFields = ['name', 'employee', 'start_date', 'end_date'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                throw new \InvalidArgumentException("Required field '$field' is missing or empty");
+            }
+        }
+        
+        // Valider les montants
+        $numericFields = ['gross_pay', 'total_deduction', 'net_pay'];
+        foreach ($numericFields as $field) {
+            if (isset($data[$field]) && !is_numeric($data[$field])) {
+                $this->logger->warning("Non-numeric value found for $field, converting", [
+                    'field' => $field,
+                    'value' => $data[$field]
+                ]);
+                $data[$field] = (float)$data[$field];
+            }
+        }
+        
+        // S'assurer que les totaux sont cohérents
+        $calculatedEarnings = 0;
+        $calculatedDeductions = 0;
+        
+        if (isset($data['earnings']) && is_array($data['earnings'])) {
+            foreach ($data['earnings'] as $earning) {
+                if (isset($earning['amount']) && is_numeric($earning['amount'])) {
+                    $calculatedEarnings += (float)$earning['amount'];
+                }
+            }
+        }
+        
+        if (isset($data['deductions']) && is_array($data['deductions'])) {
+            foreach ($data['deductions'] as $deduction) {
+                if (isset($deduction['amount']) && is_numeric($deduction['amount'])) {
+                    $calculatedDeductions += (float)$deduction['amount'];
+                }
+            }
+        }
+        
+        // Corriger les totaux si nécessaire
+        $tolerance = 0.01;
+        if (abs(($data['gross_pay'] ?? 0) - $calculatedEarnings) > $tolerance) {
+            $this->logger->info("Correcting gross_pay to match earnings total", [
+                'slip' => $data['name'],
+                'old_gross_pay' => $data['gross_pay'] ?? 0,
+                'new_gross_pay' => $calculatedEarnings
+            ]);
+            $data['gross_pay'] = $calculatedEarnings;
+        }
+        
+        if (abs(($data['total_deduction'] ?? 0) - $calculatedDeductions) > $tolerance) {
+            $this->logger->info("Correcting total_deduction to match deductions total", [
+                'slip' => $data['name'],
+                'old_total_deduction' => $data['total_deduction'] ?? 0,
+                'new_total_deduction' => $calculatedDeductions
+            ]);
+            $data['total_deduction'] = $calculatedDeductions;
+        }
+        
+        $calculatedNetPay = $calculatedEarnings - $calculatedDeductions;
+        if (abs(($data['net_pay'] ?? 0) - $calculatedNetPay) > $tolerance) {
+            $this->logger->info("Correcting net_pay to match calculated value", [
+                'slip' => $data['name'],
+                'old_net_pay' => $data['net_pay'] ?? 0,
+                'new_net_pay' => $calculatedNetPay
+            ]);
+            $data['net_pay'] = $calculatedNetPay;
+        }
+        
+        // S'assurer que les champs de base sont cohérents
+        $data['base_gross_pay'] = $data['gross_pay'];
+        $data['base_total_deduction'] = $data['total_deduction'];
+        $data['base_net_pay'] = $data['net_pay'];
+        $data['rounded_total'] = $data['net_pay'];
+        $data['base_rounded_total'] = $data['net_pay'];
+        
+        $this->logger->debug("Salary slip data validated", [
+            'slip' => $data['name'],
+            'gross_pay' => $data['gross_pay'],
+            'total_deduction' => $data['total_deduction'],
+            'net_pay' => $data['net_pay']
+        ]);
+    }
+
+    /**
+     * Ensure salary slip totals are correctly calculated
+     */
+    private function ensureSalarySlipTotals(array &$salarySlip): void
+    {
+        $totalEarnings = 0;
+        $totalDeductions = 0;
+        
+        // Calculer le total des earnings
+        if (isset($salarySlip['earnings']) && is_array($salarySlip['earnings'])) {
+            foreach ($salarySlip['earnings'] as $earning) {
+                if (isset($earning['amount']) && is_numeric($earning['amount'])) {
+                    $totalEarnings += (float)$earning['amount'];
+                }
+            }
+        }
+        
+        // Calculer le total des deductions
+        if (isset($salarySlip['deductions']) && is_array($salarySlip['deductions'])) {
+            foreach ($salarySlip['deductions'] as $deduction) {
+                if (isset($deduction['amount']) && is_numeric($deduction['amount'])) {
+                    $totalDeductions += (float)$deduction['amount'];
+                }
+            }
+        }
+        
+        // Mettre à jour les totaux
+        $salarySlip['total_earning'] = $totalEarnings;
+        $salarySlip['gross_pay'] = $totalEarnings;
+        $salarySlip['total_deduction'] = $totalDeductions;
+        $salarySlip['net_pay'] = $totalEarnings - $totalDeductions;
+        
+        // S'assurer que les champs de base sont présents
+        $salarySlip['rounded_total'] = $salarySlip['net_pay'];
+        $salarySlip['total_in_words'] = $this->numberToWords($salarySlip['net_pay']);
+        
+        $this->logger->debug("Ensured salary slip totals", [
+            'name' => $salarySlip['name'] ?? 'unknown',
+            'total_earning' => $totalEarnings,
+            'total_deduction' => $totalDeductions,
+            'net_pay' => $salarySlip['net_pay']
+        ]);
+    }
+
+    /**
+     * Convert number to words (basic implementation)
+     */
+    private function numberToWords(float $amount): string
+    {
+        // Simple implementation - can be enhanced later
+        return number_format($amount, 2) . ' Ariary';
     }
 
     /**

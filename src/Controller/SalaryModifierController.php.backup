@@ -3,73 +3,30 @@
 namespace App\Controller;
 
 use App\Service\ErpNextService;
-use App\Service\MonthlyPercentageService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Psr\Log\LoggerInterface;
 
-/**
- * Contrôleur pour la modification des fiches de paie
- * 
- * Ce contrôleur gère deux modes de modification :
- * 1. Modification classique : avec condition et nouvelle valeur fixe
- * 2. Pourcentages mensuels : application de pourcentages différents selon le mois
- * 
- * Fonctionnalités principales :
- * - Modification des composants de salaire (gains et déductions)
- * - Gestion des fiches annulées (conversion en draft)
- * - Recalcul automatique des totaux et composants dépendants
- * - Validation des données avant sauvegarde
- * - Logs détaillés pour le débogage
- */
 class SalaryModifierController extends AbstractController
 {
-    /** @var ErpNextService Service pour communiquer avec ERPNext */
     private $erpNextService;
-    
-    /** @var MonthlyPercentageService Service pour gérer les pourcentages mensuels */
-    private $monthlyPercentageService;
-    
-    /** @var LoggerInterface Logger pour tracer les opérations */
     private $logger;
 
-    /**
-     * Constructeur - Injection des dépendances
-     * 
-     * @param ErpNextService $erpNextService Service ERPNext
-     * @param MonthlyPercentageService $monthlyPercentageService Service des pourcentages
-     * @param LoggerInterface $logger Logger Symfony
-     */
-    public function __construct(
-        ErpNextService $erpNextService, 
-        MonthlyPercentageService $monthlyPercentageService,
-        LoggerInterface $logger
-    ) {
+    public function __construct(ErpNextService $erpNextService, LoggerInterface $logger)
+    {
         $this->erpNextService = $erpNextService;
-        $this->monthlyPercentageService = $monthlyPercentageService;
         $this->logger = $logger;
     }
 
-    /**
-     * Page principale de modification des fiches de paie
-     * 
-     * Gère l'affichage du formulaire et le traitement des modifications.
-     * Supporte deux modes :
-     * - Mode classique : condition + nouvelle valeur
-     * - Mode pourcentages mensuels : pourcentages différents par mois
-     * 
-     * @param Request $request Requête HTTP
-     * @return Response Réponse HTTP
-     */
     #[Route('/salary/modifier', name: 'app_salary_modifier')]
     public function index(Request $request): Response
     {
-        // Récupérer tous les composants de salaire disponibles depuis ERPNext
+        // Récupérer tous les composants de salaire disponibles
         $salaryComponents = $this->erpNextService->getSalaryComponents();
         
-        // Définir les conditions de comparaison disponibles pour le mode classique
+        // Conditions disponibles
         $conditions = [
             '=' => 'Égal à',
             '>' => 'Supérieur à',
@@ -79,62 +36,35 @@ class SalaryModifierController extends AbstractController
             '!=' => 'Différent de'
         ];
         
-        // Traitement du formulaire soumis
+        // Si le formulaire est soumis
         if ($request->isMethod('POST')) {
             try {
-                // === RÉCUPÉRATION DES PARAMÈTRES DU FORMULAIRE ===
-                $component = $request->request->get('component');                    // Composant à modifier
-                $condition = $request->request->get('condition');                    // Condition (=, >, <, etc.)
-                $conditionValue = $request->request->get('condition_value');         // Valeur de la condition
-                $newValue = $request->request->get('new_value');                     // Nouvelle valeur (mode classique)
-                $startDate = $request->request->get('start_date');                   // Date de début de période
-                $endDate = $request->request->get('end_date');                       // Date de fin de période
-                $useMonthlyPercentages = $request->request->get('use_monthly_percentages') === '1'; // Mode pourcentages mensuels
-                $monthlyPercentages = $request->request->all('monthly_percentages') ?: [];          // Pourcentages par mois
+                // Récupérer les paramètres du formulaire
+                $component = $request->request->get('component');
+                $condition = $request->request->get('condition');
+                $conditionValue = $request->request->get('condition_value');
+                $newValue = $request->request->get('new_value');
+                $startDate = $request->request->get('start_date');
+                $endDate = $request->request->get('end_date');
                 
-                // Log des paramètres reçus pour débogage
                 $this->logger->info("Form parameters received", [
                     'component' => $component,
                     'condition' => $condition,
                     'condition_value_raw' => $conditionValue,
                     'new_value_raw' => $newValue,
                     'start_date' => $startDate,
-                    'end_date' => $endDate,
-                    'use_monthly_percentages' => $useMonthlyPercentages,
-                    'monthly_percentages' => $monthlyPercentages
+                    'end_date' => $endDate
                 ]);
                 
-                // === VALIDATION DES ENTRÉES ===
-                if (!$component) {
-                    throw new \InvalidArgumentException("Le composant est requis");
+                // Valider les entrées
+                if (!$component || !$condition || $conditionValue === null || $newValue === null) {
+                    throw new \InvalidArgumentException("Tous les champs sont requis");
                 }
                 
-                if ($useMonthlyPercentages) {
-                    // MODE POURCENTAGES MENSUELS : Pas besoin de condition ni de nouvelle valeur
-                    // Les pourcentages sont appliqués selon le mois de chaque fiche de paie
-                    $this->logger->info("Using monthly percentages mode", [
-                        'component' => $component,
-                        'percentages_count' => count($monthlyPercentages)
-                    ]);
-                } else {
-                    // MODE CLASSIQUE : Condition et nouvelle valeur sont requises
-                    if (!$condition || $conditionValue === null || $newValue === null) {
-                        throw new \InvalidArgumentException("Condition, valeur de condition et nouvelle valeur sont requis pour la modification classique");
-                    }
-                }
-                
-                // === SAUVEGARDE DES POURCENTAGES MENSUELS ===
-                if ($useMonthlyPercentages) {
-                    // Sauvegarder les pourcentages en base de données pour réutilisation future
-                    $this->monthlyPercentageService->saveMonthlyPercentages($component, $monthlyPercentages);
-                }
-                
-                // === CONVERSION DES TYPES ===
-                // Convertir les valeurs en nombres pour les calculs (si applicables)
+                // Convertir en nombres si nécessaire
                 $conditionValue = is_numeric($conditionValue) ? (float)$conditionValue : $conditionValue;
                 $newValue = is_numeric($newValue) ? (float)$newValue : $newValue;
                 
-                // Log des paramètres après conversion pour vérification
                 $this->logger->info("Form parameters after conversion", [
                     'component' => $component,
                     'condition' => $condition,
@@ -144,12 +74,10 @@ class SalaryModifierController extends AbstractController
                     'new_value_type' => gettype($newValue)
                 ]);
                 
-                // === RÉCUPÉRATION DES FICHES DE PAIE ===
-                // Convertir les dates en objets DateTime pour le formatage
+                // Récupérer toutes les fiches de paie pour la période spécifiée
                 $startDateTime = new \DateTime($startDate);
                 $endDateTime = new \DateTime($endDate);
                 
-                // Récupérer toutes les fiches de paie pour la période spécifiée depuis ERPNext
                 $salarySlipsList = $this->erpNextService->getSalarySlipsByPeriod(
                     $startDateTime->format('Y-m-d'),
                     $endDateTime->format('Y-m-d')
@@ -176,50 +104,19 @@ class SalaryModifierController extends AbstractController
                 
                 foreach ($salarySlipsList as $slipSummary) {
                     try {
-                        $this->logger->info("Processing salary slip", [
-                            'slip_name' => $slipSummary['name'] ?? 'unknown',
-                            'slip_summary' => $slipSummary
-                        ]);
-                        
                         // Récupérer les détails complets de la fiche de paie
                         $slip = $this->erpNextService->getSalarySlipDetails($slipSummary['name']);
                         
                         if (!$slip) {
                             $this->logger->warning("Could not retrieve details for salary slip", [
-                                'slip_name' => $slipSummary['name'],
-                                'slip_summary' => $slipSummary
+                                'slip_name' => $slipSummary['name']
                             ]);
                             $errorCount++;
                             continue;
                         }
                         
-                        // Vérifier le statut de la fiche de paie
-                        $docstatus = $slip['docstatus'] ?? 0;
-                        $this->logger->info("Processing salary slip with status", [
-                            'slip_name' => $slip['name'],
-                            'docstatus' => $docstatus,
-                            'status_meaning' => $docstatus == 0 ? 'Draft' : ($docstatus == 1 ? 'Submitted' : 'Cancelled')
-                        ]);
-                        
-                        $this->logger->info("Retrieved salary slip details", [
-                            'slip_name' => $slip['name'] ?? 'unknown',
-                            'docstatus' => $docstatus,
-                            'has_earnings' => isset($slip['earnings']),
-                            'has_deductions' => isset($slip['deductions']),
-                            'earnings_count' => isset($slip['earnings']) ? count($slip['earnings']) : 0,
-                            'deductions_count' => isset($slip['deductions']) ? count($slip['deductions']) : 0,
-                            'start_date' => $slip['start_date'] ?? 'not_set'
-                        ]);
-                        
                         $modified = false;
                         $componentFound = false;
-                        
-                        // Extraire le mois de la fiche de paie pour les pourcentages mensuels
-                        $slipMonth = null;
-                        if (isset($slip['start_date'])) {
-                            $slipDate = new \DateTime($slip['start_date']);
-                            $slipMonth = (int) $slipDate->format('n'); // n = mois sans zéro initial
-                        }
                         
                         // Log des composants disponibles pour débogage
                         $availableEarnings = [];
@@ -242,49 +139,27 @@ class SalaryModifierController extends AbstractController
                         // Vérifier si le composant existe dans les gains
                         if (isset($slip['earnings'])) {
                             foreach ($slip['earnings'] as $index => $earning) {
-                                // Comparaison flexible pour les noms de composants
-                                $earningComponent = strtolower(trim($earning['salary_component']));
-                                $searchComponent = strtolower(trim($component));
-                                
-                                // Normaliser les variations communes
-                                $earningComponent = str_replace(['salaire de base', 'salaire base'], 'salaire_base', $earningComponent);
-                                $searchComponent = str_replace(['salaire de base', 'salaire base'], 'salaire_base', $searchComponent);
-                                
-                                if ($earningComponent === $searchComponent || $earning['salary_component'] === $component) {
+                                if ($earning['salary_component'] === $component) {
                                     $componentFound = true;
+                                    // Vérifier la condition
                                     $currentValue = $earning['amount'];
                                     
-                                    // Pour les pourcentages mensuels, pas de vérification de condition
-                                    $conditionMet = $useMonthlyPercentages || $this->checkCondition($currentValue, $condition, $conditionValue);
+
                                     
-                                    if ($conditionMet) {
-                                        if ($useMonthlyPercentages && $slipMonth !== null) {
-                                            // SOLUTION SIMPLE: Prendre la valeur, multiplier par le pourcentage, remplacer
-                                            $finalValue = $this->monthlyPercentageService->applyMonthlyPercentage(
-                                                $currentValue, 
-                                                $slipMonth, 
-                                                $component
-                                            );
-                                        } else {
-                                            // Mode classique
-                                            $finalValue = $newValue;
-                                        }
-                                        
-                                        // Supprimer l'ancienne valeur et entrer la nouvelle
-                                        $slip['earnings'][$index]['amount'] = $finalValue;
+                                    if ($this->checkCondition($currentValue, $condition, $conditionValue)) {
+                                        // Modifier la valeur
+                                        $slip['earnings'][$index]['amount'] = $newValue;
                                         $modified = true;
                                         
                                         $this->logger->info("Modified earning component", [
                                             'slip' => $slip['name'],
                                             'component' => $component,
                                             'old_value' => $currentValue,
-                                            'new_value' => $finalValue,
-                                            'month' => $slipMonth,
-                                            'used_monthly_percentage' => $useMonthlyPercentages
+                                            'new_value' => $newValue
                                         ]);
                                         
                                         // Recalculer les composants dépendants selon le composant modifié
-                                        $this->handleComponentDependencies($slip, $component, $finalValue);
+                                        $this->handleComponentDependencies($slip, $component, $newValue);
                                     }
                                 }
                             }
@@ -293,49 +168,27 @@ class SalaryModifierController extends AbstractController
                         // Vérifier si le composant existe dans les déductions
                         if (isset($slip['deductions'])) {
                             foreach ($slip['deductions'] as $index => $deduction) {
-                                // Comparaison flexible pour les noms de composants
-                                $deductionComponent = strtolower(trim($deduction['salary_component']));
-                                $searchComponent = strtolower(trim($component));
-                                
-                                // Normaliser les variations communes
-                                $deductionComponent = str_replace(['salaire de base', 'salaire base'], 'salaire_base', $deductionComponent);
-                                $searchComponent = str_replace(['salaire de base', 'salaire base'], 'salaire_base', $searchComponent);
-                                
-                                if ($deductionComponent === $searchComponent || $deduction['salary_component'] === $component) {
+                                if ($deduction['salary_component'] === $component) {
                                     $componentFound = true;
+                                    // Vérifier la condition
                                     $currentValue = $deduction['amount'];
                                     
-                                    // Pour les pourcentages mensuels, pas de vérification de condition
-                                    $conditionMet = $useMonthlyPercentages || $this->checkCondition($currentValue, $condition, $conditionValue);
+
                                     
-                                    if ($conditionMet) {
-                                        if ($useMonthlyPercentages && $slipMonth !== null) {
-                                            // SOLUTION SIMPLE: Prendre la valeur, multiplier par le pourcentage, remplacer
-                                            $finalValue = $this->monthlyPercentageService->applyMonthlyPercentage(
-                                                $currentValue, 
-                                                $slipMonth, 
-                                                $component
-                                            );
-                                        } else {
-                                            // Mode classique
-                                            $finalValue = $newValue;
-                                        }
-                                        
-                                        // Supprimer l'ancienne valeur et entrer la nouvelle
-                                        $slip['deductions'][$index]['amount'] = $finalValue;
+                                    if ($this->checkCondition($currentValue, $condition, $conditionValue)) {
+                                        // Modifier la valeur
+                                        $slip['deductions'][$index]['amount'] = $newValue;
                                         $modified = true;
                                         
                                         $this->logger->info("Modified deduction component", [
                                             'slip' => $slip['name'],
                                             'component' => $component,
                                             'old_value' => $currentValue,
-                                            'new_value' => $finalValue,
-                                            'month' => $slipMonth,
-                                            'used_monthly_percentage' => $useMonthlyPercentages
+                                            'new_value' => $newValue
                                         ]);
                                         
                                         // Recalculer les composants dépendants selon le composant modifié
-                                        $this->handleComponentDependencies($slip, $component, $finalValue);
+                                        $this->handleComponentDependencies($slip, $component, $newValue);
                                     }
                                 }
                             }
@@ -343,88 +196,20 @@ class SalaryModifierController extends AbstractController
                         
 
                         
-                        // Log si le composant n'a pas été trouvé
-                        if (!$componentFound) {
-                            $this->logger->warning("Component not found in salary slip", [
-                                'slip_name' => $slip['name'],
-                                'component_searched' => $component,
-                                'available_earnings' => $availableEarnings,
-                                'available_deductions' => $availableDeductions
-                            ]);
-                        }
-                        
                         // Si des modifications ont été apportées, mettre à jour la fiche de paie
                         if ($modified) {
                             // Recalculer les totaux finaux après toutes les modifications
                             $this->recalculateSalarySlipTotals($slip);
                             
-                            // Validation des totaux avant sauvegarde
-                            $this->validateSalarySlipTotals($slip);
-                            
-                            // Log des totaux avant sauvegarde
-                            $this->logger->info("Saving salary slip with updated totals", [
-                                'slip' => $slip['name'],
-                                'gross_pay_to_save' => $slip['gross_pay'],
-                                'total_deduction_to_save' => $slip['total_deduction'],
-                                'net_pay_to_save' => $slip['net_pay'],
-                                'used_monthly_percentages' => $useMonthlyPercentages,
-                                'slip_month' => $slipMonth
-                            ]);
-                            
-                            // Sauvegarder avec gestion d'erreur améliorée
-                            try {
-                                $this->erpNextService->updateSalarySlip($slip);
-                                $modifiedCount++;
-                                
-                                $this->logger->info("Salary slip successfully updated", [
-                                    'slip' => $slip['name'],
-                                    'final_gross_pay' => $slip['gross_pay'],
-                                    'final_net_pay' => $slip['net_pay']
-                                ]);
-                            } catch (\Exception $updateException) {
-                                $errorMessage = $updateException->getMessage();
-                                
-                                // Gestion spécifique des erreurs de documents annulés
-                                if (strpos($errorMessage, 'Cannot edit cancelled document') !== false || 
-                                    strpos($errorMessage, 'Cannot update cancelled salary slip') !== false) {
-                                    $this->logger->warning("Skipping cancelled salary slip", [
-                                        'slip' => $slip['name'],
-                                        'reason' => 'Document is cancelled and cannot be modified',
-                                        'docstatus' => $slip['docstatus'] ?? 'unknown',
-                                        'error_type' => 'cancelled_document'
-                                    ]);
-                                    $skippedCount++;
-                                } else {
-                                    $this->logger->error("Failed to update salary slip with monthly percentages", [
-                                        'slip' => $slip['name'],
-                                        'error' => $errorMessage,
-                                        'error_type' => get_class($updateException),
-                                        'slip_data' => [
-                                            'gross_pay' => $slip['gross_pay'],
-                                            'total_deduction' => $slip['total_deduction'],
-                                            'net_pay' => $slip['net_pay'],
-                                            'docstatus' => $slip['docstatus'] ?? 'unknown'
-                                        ]
-                                    ]);
-                                    $errorCount++;
-                                }
-                                continue;
-                            }
+                            $this->erpNextService->updateSalarySlip($slip);
+                            $modifiedCount++;
                         } else {
                             $skippedCount++;
-                            $this->logger->info("Salary slip skipped", [
-                                'slip_name' => $slip['name'],
-                                'reason' => $componentFound ? 'condition_not_met' : 'component_not_found',
-                                'component_searched' => $component
-                            ]);
                         }
                     } catch (\Exception $e) {
                         $this->logger->error("Failed to modify salary slip", [
                             'slip' => $slipSummary['name'] ?? 'unknown',
                             'error' => $e->getMessage(),
-                            'error_class' => get_class($e),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
                             'trace' => $e->getTraceAsString()
                         ]);
                         
@@ -463,19 +248,7 @@ class SalaryModifierController extends AbstractController
         
         return $this->render('salary_modifier/index.html.twig', [
             'salaryComponents' => $salaryComponents,
-            'conditions' => $conditions,
-            'monthNames' => $this->monthlyPercentageService->getMonthNames()
-        ]);
-    }
-
-    #[Route('/salary/modifier/percentages/{component}', name: 'app_salary_modifier_percentages', methods: ['GET'])]
-    public function getMonthlyPercentages(string $component): Response
-    {
-        $percentages = $this->monthlyPercentageService->getMonthlyPercentages($component);
-        
-        return $this->json([
-            'success' => true,
-            'percentages' => $percentages
+            'conditions' => $conditions
         ]);
     }
     
@@ -761,67 +534,170 @@ class SalaryModifierController extends AbstractController
             }
         }
     }
+    
+
+    
     /**
-     * Valide la cohérence des totaux de la fiche de paie
+     * Recalcule les composants dépendants de l'Indemnité
      */
-    private function validateSalarySlipTotals(array &$slip): void
+    private function recalculateFromIndemnite(array &$slip, float $newIndemnite): void
     {
-        $calculatedEarnings = 0;
-        $calculatedDeductions = 0;
+        $this->logger->info("Recalculating from Indemnité change", [
+            'slip' => $slip['name'],
+            'new_indemnite' => $newIndemnite
+        ]);
         
-        // Calculer les totaux attendus
+        // Récupérer le Salaire Base actuel
+        $currentSalaireBase = 0;
         if (isset($slip['earnings'])) {
             foreach ($slip['earnings'] as $earning) {
-                $calculatedEarnings += $earning['amount'] ?? 0;
+                if ($earning['salary_component'] === 'Salaire Base') {
+                    $currentSalaireBase = $earning['amount'];
+                    break;
+                }
             }
         }
         
+        // Recalculer la Taxe sociale avec la nouvelle Indemnité
+        $newTaxeSociale = ($currentSalaireBase + $newIndemnite) * 0.2;
+        
+        // Mettre à jour la Taxe sociale dans les deductions
         if (isset($slip['deductions'])) {
-            foreach ($slip['deductions'] as $deduction) {
-                $calculatedDeductions += $deduction['amount'] ?? 0;
+            foreach ($slip['deductions'] as $index => $deduction) {
+                if ($deduction['salary_component'] === 'Taxe sociale') {
+                    $oldTaxeSociale = $deduction['amount'];
+                    $slip['deductions'][$index]['amount'] = $newTaxeSociale;
+                    
+                    $this->logger->info("Recalculated Taxe sociale from Indemnité change", [
+                        'slip' => $slip['name'],
+                        'old_value' => $oldTaxeSociale,
+                        'new_value' => $newTaxeSociale,
+                        'formula' => '(SB + IND) * 0.2',
+                        'salaire_base' => $currentSalaireBase,
+                        'indemnite' => $newIndemnite
+                    ]);
+                    break;
+                }
             }
         }
         
-        $calculatedNetPay = $calculatedEarnings - $calculatedDeductions;
-        
-        // Vérifier la cohérence avec une tolérance de 0.01
-        $tolerance = 0.01;
-        
-        if (abs(($slip['gross_pay'] ?? 0) - $calculatedEarnings) > $tolerance) {
-            $this->logger->warning("Gross pay mismatch detected, correcting", [
-                'slip' => $slip['name'],
-                'stored_gross_pay' => $slip['gross_pay'] ?? 0,
-                'calculated_earnings' => $calculatedEarnings
-            ]);
-            $slip['gross_pay'] = $calculatedEarnings;
-        }
-        
-        if (abs(($slip['total_deduction'] ?? 0) - $calculatedDeductions) > $tolerance) {
-            $this->logger->warning("Total deduction mismatch detected, correcting", [
-                'slip' => $slip['name'],
-                'stored_total_deduction' => $slip['total_deduction'] ?? 0,
-                'calculated_deductions' => $calculatedDeductions
-            ]);
-            $slip['total_deduction'] = $calculatedDeductions;
-        }
-        
-        if (abs(($slip['net_pay'] ?? 0) - $calculatedNetPay) > $tolerance) {
-            $this->logger->warning("Net pay mismatch detected, correcting", [
-                'slip' => $slip['name'],
-                'stored_net_pay' => $slip['net_pay'] ?? 0,
-                'calculated_net_pay' => $calculatedNetPay
-            ]);
-            $slip['net_pay'] = $calculatedNetPay;
-        }
-        
-        // S'assurer que tous les champs de base sont cohérents
-        $slip['base_gross_pay'] = $slip['gross_pay'];
-        $slip['base_total_deduction'] = $slip['total_deduction'];
-        $slip['base_net_pay'] = $slip['net_pay'];
-        $slip['rounded_total'] = $slip['net_pay'];
-        $slip['base_rounded_total'] = $slip['net_pay'];
+        // Recalculer les totaux de la fiche de paie
+        $this->recalculateSalarySlipTotals($slip);
     }
-
+    
+    /**
+     * Recalcule rétroactivement depuis la Taxe sociale (recalcul bidirectionnel)
+     */
+    private function recalculateFromTaxeSociale(array &$slip, float $newTaxeSociale): void
+    {
+        $this->logger->info("Recalculating backwards from Taxe sociale", [
+            'slip' => $slip['name'],
+            'new_taxe_sociale' => $newTaxeSociale
+        ]);
+        
+        // Formule inverse : (SB + IND) = TS / 0.2
+        $totalSalaireBaseIndemnite = $newTaxeSociale / 0.2;
+        
+        // Récupérer le ratio actuel SB/IND pour maintenir la proportion
+        $currentSalaireBase = 0;
+        $currentIndemnite = 0;
+        
+        if (isset($slip['earnings'])) {
+            foreach ($slip['earnings'] as $earning) {
+                if ($earning['salary_component'] === 'Salaire Base') {
+                    $currentSalaireBase = $earning['amount'];
+                } elseif ($earning['salary_component'] === 'Indemnité') {
+                    $currentIndemnite = $earning['amount'];
+                }
+            }
+        }
+        
+        // Calculer le nouveau Salaire Base et Indemnité en maintenant le ratio 70/30
+        // SB = 70% du total, IND = 30% du total
+        $newSalaireBase = $totalSalaireBaseIndemnite * (10/13); // 10/13 ≈ 0.769 (car SB/(SB+IND) quand IND=SB*0.3)
+        $newIndemnite = $totalSalaireBaseIndemnite * (3/13);    // 3/13 ≈ 0.231
+        
+        // Mettre à jour le Salaire Base
+        if (isset($slip['earnings'])) {
+            foreach ($slip['earnings'] as $index => $earning) {
+                if ($earning['salary_component'] === 'Salaire Base') {
+                    $slip['earnings'][$index]['amount'] = $newSalaireBase;
+                    
+                    $this->logger->info("Recalculated Salaire Base from Taxe sociale", [
+                        'slip' => $slip['name'],
+                        'old_value' => $currentSalaireBase,
+                        'new_value' => $newSalaireBase,
+                        'calculation' => 'Backward from TS'
+                    ]);
+                    break;
+                }
+            }
+        }
+        
+        // Mettre à jour l'Indemnité
+        if (isset($slip['earnings'])) {
+            foreach ($slip['earnings'] as $index => $earning) {
+                if ($earning['salary_component'] === 'Indemnité') {
+                    $slip['earnings'][$index]['amount'] = $newIndemnite;
+                    
+                    $this->logger->info("Recalculated Indemnité from Taxe sociale", [
+                        'slip' => $slip['name'],
+                        'old_value' => $currentIndemnite,
+                        'new_value' => $newIndemnite,
+                        'calculation' => 'Backward from TS'
+                    ]);
+                    break;
+                }
+            }
+        }
+        
+        // Recalculer les totaux de la fiche de paie
+        $this->recalculateSalarySlipTotals($slip);
+    }
+    
+    /**
+     * Recalcule la Taxe sociale basée sur tous les composants earnings
+     */
+    private function recalculateTaxeSocialeFromAllComponents(array &$slip): void
+    {
+        $this->logger->info("Recalculating Taxe sociale from all components", [
+            'slip' => $slip['name']
+        ]);
+        
+        // Calculer le total de tous les earnings (gains)
+        $totalEarnings = 0;
+        if (isset($slip['earnings'])) {
+            foreach ($slip['earnings'] as $earning) {
+                $totalEarnings += $earning['amount'];
+            }
+        }
+        
+        // Calculer la nouvelle Taxe sociale (20% du total des gains)
+        $newTaxeSociale = $totalEarnings * 0.2;
+        
+        // Mettre à jour la Taxe sociale dans les deductions
+        if (isset($slip['deductions'])) {
+            foreach ($slip['deductions'] as $index => $deduction) {
+                if ($deduction['salary_component'] === 'Taxe sociale') {
+                    $oldTaxeSociale = $deduction['amount'];
+                    $slip['deductions'][$index]['amount'] = $newTaxeSociale;
+                    
+                    $this->logger->info("Recalculated Taxe sociale from all earnings", [
+                        'slip' => $slip['name'],
+                        'old_value' => $oldTaxeSociale,
+                        'new_value' => $newTaxeSociale,
+                        'total_earnings' => $totalEarnings,
+                        'formula' => 'Total Earnings * 0.2'
+                    ]);
+                    break;
+                }
+            }
+        }
+        
+        // Recalculer les totaux de la fiche de paie
+        $this->recalculateSalarySlipTotals($slip);
+    }
+    
     /**
      * Recalcule les totaux de la fiche de paie
      */
@@ -829,30 +705,18 @@ class SalaryModifierController extends AbstractController
     {
         $totalEarnings = 0;
         $totalDeductions = 0;
-        $earningsDetails = [];
-        $deductionsDetails = [];
         
-        // Calculer le total des gains avec détails
+        // Calculer le total des gains
         if (isset($slip['earnings'])) {
             foreach ($slip['earnings'] as $earning) {
-                $amount = $earning['amount'] ?? 0;
-                $totalEarnings += $amount;
-                $earningsDetails[] = [
-                    'component' => $earning['salary_component'] ?? 'Unknown',
-                    'amount' => $amount
-                ];
+                $totalEarnings += $earning['amount'];
             }
         }
         
-        // Calculer le total des déductions avec détails
+        // Calculer le total des déductions
         if (isset($slip['deductions'])) {
             foreach ($slip['deductions'] as $deduction) {
-                $amount = $deduction['amount'] ?? 0;
-                $totalDeductions += $amount;
-                $deductionsDetails[] = [
-                    'component' => $deduction['salary_component'] ?? 'Unknown',
-                    'amount' => $amount
-                ];
+                $totalDeductions += $deduction['amount'];
             }
         }
         
@@ -872,11 +736,6 @@ class SalaryModifierController extends AbstractController
         
         $this->logger->info("Recalculated salary slip totals", [
             'slip' => $slip['name'],
-            'earnings_details' => $earningsDetails,
-            'deductions_details' => $deductionsDetails,
-            'total_earnings_calculated' => $totalEarnings,
-            'total_deductions_calculated' => $totalDeductions,
-            'net_pay_calculated' => $totalEarnings - $totalDeductions,
             'old_gross_pay' => $oldGrossPay,
             'new_gross_pay' => $slip['gross_pay'],
             'old_total_deduction' => $oldTotalDeduction,
