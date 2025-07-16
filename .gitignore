@@ -19,3 +19,25 @@
 /assets/vendor/
 ###< symfony/asset-mapper ###
 node_modules
+
+# Archive et fichiers temporaires
+/archive/
+test_*.php
+debug_*.php
+demo_*.php
+diagnose_*.php
+monitor_*.php
+validate_*.php
+*.csv
+
+# IDE et outils
+/.codemate/
+/.kilocode/
+/.qodo/
+/.zencoder/
+/.vscode/
+.phpunit.cache/
+
+# Logs et cache
+/var/log/
+/var/cache/
