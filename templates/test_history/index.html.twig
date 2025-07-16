@@ -1,0 +1,347 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Test du Système d'Historique{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-flask"></i> Test du Système d'Historique</h1>
+                <div>
+                    <a href="{{ path('app_change_history_index') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-history"></i> Voir l'historique complet
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alertes -->
+    <div id="alerts-container"></div>
+
+    <!-- Statistiques en temps réel -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h5 class="card-title">Modifications aujourd'hui</h5>
+                    <h2 id="today-count">-</h2>
+                    <button class="btn btn-light btn-sm" onclick="refreshStats()">
+                        <i class="fas fa-sync"></i> Actualiser
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Fiches de paie</h5>
+                    <h2 id="payslip-count">-</h2>
+                    <small>Modifications de salaires</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Pourcentages</h5>
+                    <h2 id="percentage-count">-</h2>
+                    <small>Modifications mensuelles</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Formulaires de test -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-euro-sign"></i> Test Modification Salaire</h5>
+                </div>
+                <div class="card-body">
+                    <form id="salary-form">
+                        <div class="mb-3">
+                            <label for="payslip-id" class="form-label">ID Fiche de paie</label>
+                            <input type="text" class="form-control" id="payslip-id" value="SAL-TEST-001">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="old-salary" class="form-label">Ancien salaire (€)</label>
+                                    <input type="number" class="form-control" id="old-salary" value="2500" step="0.01">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="new-salary" class="form-label">Nouveau salaire (€)</label>
+                                    <input type="number" class="form-control" id="new-salary" value="2800" step="0.01">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="salary-reason" class="form-label">Raison de la modification</label>
+                            <textarea class="form-control" id="salary-reason" rows="2">Test de modification de salaire via interface web</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Enregistrer la modification
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-percentage"></i> Test Modification Pourcentage</h5>
+                </div>
+                <div class="card-body">
+                    <form id="percentage-form">
+                        <div class="mb-3">
+                            <label for="component" class="form-label">Composant</label>
+                            <select class="form-control" id="component">
+                                <option value="Prime transport">Prime transport</option>
+                                <option value="Prime ancienneté">Prime ancienneté</option>
+                                <option value="Prime performance">Prime performance</option>
+                                <option value="Prime fin d'année">Prime fin d'année</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="month" class="form-label">Mois</label>
+                            <select class="form-control" id="month">
+                                <option value="1">Janvier</option>
+                                <option value="2">Février</option>
+                                <option value="3" selected>Mars</option>
+                                <option value="4">Avril</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juin</option>
+                                <option value="7">Juillet</option>
+                                <option value="8">Août</option>
+                                <option value="9">Septembre</option>
+                                <option value="10">Octobre</option>
+                                <option value="11">Novembre</option>
+                                <option value="12">Décembre</option>
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="old-percentage" class="form-label">Ancien pourcentage (%)</label>
+                                    <input type="number" class="form-control" id="old-percentage" value="10" step="0.1">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="new-percentage" class="form-label">Nouveau pourcentage (%)</label>
+                                    <input type="number" class="form-control" id="new-percentage" value="15" step="0.1">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="percentage-reason" class="form-label">Raison de la modification</label>
+                            <textarea class="form-control" id="percentage-reason" rows="2">Test de modification de pourcentage via interface web</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-save"></i> Enregistrer la modification
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Historique en temps réel -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clock"></i> Historique en temps réel</h5>
+                    <button class="btn btn-outline-primary btn-sm" onclick="refreshHistory()">
+                        <i class="fas fa-sync"></i> Actualiser
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="history-container">
+                        <div class="text-center py-4">
+                            <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                            <p class="text-muted mt-2">Chargement de l'historique...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Charger les données initiales
+    refreshStats();
+    refreshHistory();
+
+    // Gestionnaire pour le formulaire de salaire
+    document.getElementById('salary-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const data = {
+            payslip_id: document.getElementById('payslip-id').value,
+            old_salary: parseFloat(document.getElementById('old-salary').value),
+            new_salary: parseFloat(document.getElementById('new-salary').value),
+            reason: document.getElementById('salary-reason').value
+        };
+
+        fetch('{{ path('app_test_modify_salary') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showAlert('success', 'Modification de salaire enregistrée avec succès !');
+                refreshStats();
+                refreshHistory();
+                
+                // Incrémenter les valeurs pour le prochain test
+                document.getElementById('old-salary').value = data.new_salary;
+                document.getElementById('new-salary').value = data.new_salary + 100;
+            } else {
+                showAlert('danger', 'Erreur lors de l\'enregistrement');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showAlert('danger', 'Erreur de communication avec le serveur');
+        });
+    });
+
+    // Gestionnaire pour le formulaire de pourcentage
+    document.getElementById('percentage-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const data = {
+            component: document.getElementById('component').value,
+            month: parseInt(document.getElementById('month').value),
+            old_percentage: parseFloat(document.getElementById('old-percentage').value),
+            new_percentage: parseFloat(document.getElementById('new-percentage').value),
+            reason: document.getElementById('percentage-reason').value
+        };
+
+        fetch('{{ path('app_test_modify_percentage') }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                showAlert('success', 'Modification de pourcentage enregistrée avec succès !');
+                refreshStats();
+                refreshHistory();
+                
+                // Incrémenter les valeurs pour le prochain test
+                document.getElementById('old-percentage').value = data.new_percentage;
+                document.getElementById('new-percentage').value = data.new_percentage + 2;
+            } else {
+                showAlert('danger', 'Erreur lors de l\'enregistrement');
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            showAlert('danger', 'Erreur de communication avec le serveur');
+        });
+    });
+});
+
+function refreshStats() {
+    fetch('{{ path('app_test_history_stats') }}')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                document.getElementById('today-count').textContent = result.data.today_total;
+                
+                const payslipCount = result.data.by_entity['Salary Slip'] ? 
+                    Object.values(result.data.by_entity['Salary Slip']).reduce((a, b) => a + b, 0) : 0;
+                document.getElementById('payslip-count').textContent = payslipCount;
+                
+                const percentageCount = result.data.by_entity['Monthly Percentage'] ? 
+                    Object.values(result.data.by_entity['Monthly Percentage']).reduce((a, b) => a + b, 0) : 0;
+                document.getElementById('percentage-count').textContent = percentageCount;
+            }
+        })
+        .catch(error => console.error('Erreur lors du chargement des stats:', error));
+}
+
+function refreshHistory() {
+    fetch('{{ path('app_test_recent_history') }}')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                const container = document.getElementById('history-container');
+                
+                if (result.data.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-4">
+                            <i class="fas fa-history fa-2x text-muted"></i>
+                            <p class="text-muted mt-2">Aucune modification récente</p>
+                        </div>
+                    `;
+                } else {
+                    let html = '<div class="table-responsive"><table class="table table-sm mb-0">';
+                    html += '<thead class="table-light"><tr><th>Heure</th><th>Type</th><th>Champ</th><th>Action</th></tr></thead><tbody>';
+                    
+                    result.data.forEach(change => {
+                        const time = new Date(change.changed_at).toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                        });
+                        
+                        html += `
+                            <tr>
+                                <td><small>${time}</small></td>
+                                <td><small class="badge bg-light text-dark">${change.entity_type}</small></td>
+                                <td><small><strong>${change.field_name}</strong></small></td>
+                                <td><span class="badge ${change.action_class} badge-sm">${change.action}</span></td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erreur lors du chargement de l\'historique:', error);
+            document.getElementById('history-container').innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    <p class="mt-2">Erreur lors du chargement</p>
+                </div>
+            `;
+        });
+}
+
+function showAlert(type, message) {
+    const alertsContainer = document.getElementById('alerts-container');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    alertsContainer.appendChild(alertDiv);
+    
+    // Supprimer automatiquement après 5 secondes
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,245 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Aide - Format des fichiers CSV{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1>Guide d'importation CSV</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle"></i> Information importante</h5>
+                <p>Cette page vous explique le format exact requis pour chaque fichier CSV à importer.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fichier des employés -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-users"></i> Fichier des employés</h3>
+        </div>
+        <div class="card-body">
+            <h5>Colonnes requises :</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Colonne</th>
+                            <th>Description</th>
+                            <th>Format</th>
+                            <th>Exemple</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Ref</code></td>
+                            <td>Référence unique de l'employé</td>
+                            <td>Texte</td>
+                            <td>EMP001</td>
+                        </tr>
+                        <tr>
+                            <td><code>Nom</code></td>
+                            <td>Nom de famille</td>
+                            <td>Texte</td>
+                            <td>Dupont</td>
+                        </tr>
+                        <tr>
+                            <td><code>Prenom</code></td>
+                            <td>Prénom</td>
+                            <td>Texte</td>
+                            <td>Jean</td>
+                        </tr>
+                        <tr>
+                            <td><code>genre</code></td>
+                            <td>Genre</td>
+                            <td>Male/Female</td>
+                            <td>Male</td>
+                        </tr>
+                        <tr>
+                            <td><code>Date embauche</code></td>
+                            <td>Date d'embauche</td>
+                            <td>DD/MM/YYYY</td>
+                            <td>15/03/2023</td>
+                        </tr>
+                        <tr>
+                            <td><code>date naissance</code></td>
+                            <td>Date de naissance</td>
+                            <td>DD/MM/YYYY</td>
+                            <td>22/08/1990</td>
+                        </tr>
+                        <tr>
+                            <td><code>company</code></td>
+                            <td>Nom de l'entreprise</td>
+                            <td>Texte</td>
+                            <td>Ma Société</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5>Exemple de fichier :</h5>
+            <pre class="bg-light p-3"><code>Ref,Nom,Prenom,genre,Date embauche,date naissance,company
+EMP001,Dupont,Jean,Male,15/03/2023,22/08/1990,Ma Société
+EMP002,Martin,Marie,Female,10/01/2022,15/05/1985,Ma Société</code></pre>
+        </div>
+    </div>
+
+    <!-- Fichier des structures salariales -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-cogs"></i> Fichier des structures salariales</h3>
+        </div>
+        <div class="card-body">
+            <h5>Colonnes requises :</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Colonne</th>
+                            <th>Description</th>
+                            <th>Format</th>
+                            <th>Exemple</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>salary structure</code></td>
+                            <td>Nom de la structure salariale</td>
+                            <td>Texte</td>
+                            <td>Standard Salary</td>
+                        </tr>
+                        <tr>
+                            <td><code>name</code></td>
+                            <td>Nom du composant</td>
+                            <td>Texte</td>
+                            <td>Basic Salary</td>
+                        </tr>
+                        <tr>
+                            <td><code>Abbr</code></td>
+                            <td>Abréviation</td>
+                            <td>Texte court</td>
+                            <td>BS</td>
+                        </tr>
+                        <tr>
+                            <td><code>type</code></td>
+                            <td>Type de composant</td>
+                            <td>earning/deduction</td>
+                            <td>earning</td>
+                        </tr>
+                        <tr>
+                            <td><code>valeur</code></td>
+                            <td>Valeur ou formule</td>
+                            <td>base ou formule</td>
+                            <td>base ou 5000</td>
+                        </tr>
+                        <tr>
+                            <td><code>company</code></td>
+                            <td>Nom de l'entreprise</td>
+                            <td>Texte</td>
+                            <td>Ma Société</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5>Exemple de fichier :</h5>
+            <pre class="bg-light p-3"><code>salary structure,name,Abbr,type,valeur,company
+Standard Salary,Basic Salary,BS,earning,base,Ma Société
+Standard Salary,Transport Allowance,TA,earning,5000,Ma Société
+Standard Salary,Tax,TAX,deduction,base * 0.1,Ma Société</code></pre>
+        </div>
+    </div>
+
+    <!-- Fichier des données salariales -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-money-bill-wave"></i> Fichier des données salariales</h3>
+        </div>
+        <div class="card-body">
+            <h5>Colonnes requises :</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Colonne</th>
+                            <th>Description</th>
+                            <th>Format</th>
+                            <th>Exemple</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>Mois</code></td>
+                            <td>Période de paie</td>
+                            <td>MM/YYYY ou DD/MM/YYYY</td>
+                            <td>01/2024</td>
+                        </tr>
+                        <tr>
+                            <td><code>Ref Employe</code></td>
+                            <td>Référence de l'employé</td>
+                            <td>Texte (doit exister dans le fichier employés)</td>
+                            <td>EMP001</td>
+                        </tr>
+                        <tr>
+                            <td><code>Salaire Base</code></td>
+                            <td>Montant du salaire de base</td>
+                            <td>Nombre</td>
+                            <td>50000</td>
+                        </tr>
+                        <tr>
+                            <td><code>Salaire</code></td>
+                            <td>Structure salariale à utiliser</td>
+                            <td>Texte (doit exister dans le fichier structures)</td>
+                            <td>Standard Salary</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <h5>Exemple de fichier :</h5>
+            <pre class="bg-light p-3"><code>Mois,Ref Employe,Salaire Base,Salaire
+01/2024,EMP001,50000,Standard Salary
+01/2024,EMP002,45000,Standard Salary</code></pre>
+        </div>
+    </div>
+
+    <!-- Conseils -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-lightbulb"></i> Conseils et bonnes pratiques</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>✅ À faire :</h5>
+                    <ul>
+                        <li>Utilisez l'encodage UTF-8 pour vos fichiers</li>
+                        <li>Respectez exactement les noms de colonnes</li>
+                        <li>Vérifiez que toutes les références sont cohérentes</li>
+                        <li>Utilisez le format de date DD/MM/YYYY</li>
+                        <li>Évitez les espaces en début/fin de cellule</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>❌ À éviter :</h5>
+                    <ul>
+                        <li>Laisser des cellules vides pour les champs requis</li>
+                        <li>Utiliser des caractères spéciaux dans les références</li>
+                        <li>Mélanger les formats de date</li>
+                        <li>Référencer des employés ou structures inexistants</li>
+                        <li>Utiliser des virgules dans les valeurs numériques</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center">
+        <a href="{{ path('app_import') }}" class="btn btn-primary btn-lg">
+            <i class="fas fa-upload"></i> Commencer l'importation
+        </a>
+    </div>
+</div>
+{% endblock %}

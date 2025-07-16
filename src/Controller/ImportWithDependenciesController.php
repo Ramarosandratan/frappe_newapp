@@ -2,6 +2,17 @@
 
 namespace App\Controller;
 
+/**
+ * Contrôleur pour l'importation avec dépendances entre les données.
+ *
+ * Gère l'importation coordonnée de :
+ * - Employés
+ * - Composants salariaux
+ * - Structures salariales
+ * - Bulletins de paie
+ *
+ * Assure la cohérence des données importées en gérant les relations entre elles.
+ */
 use App\Service\ErpNextImportService;
 use League\Csv\Reader;
 use Psr\Log\LoggerInterface;
@@ -11,6 +22,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * Contrôleur pour l'importation des données avec dépendances (employés, composants salariaux et bulletins).
+ * Gère l'importation coordonnée de plusieurs types de données liées entre elles.
+ */
 class ImportWithDependenciesController extends AbstractController
 {
     public function __construct(
@@ -20,6 +35,13 @@ class ImportWithDependenciesController extends AbstractController
     }
 
     #[Route('/import/with-dependencies', name: 'app_import_with_dependencies')]
+    /**
+     * Affiche et traite le formulaire d'importation avec dépendances.
+     *
+     * @param Request $request L'objet requête HTTP contenant les fichiers uploadés
+     * @return Response La réponse HTTP rendant la vue ou redirigeant
+     * @throws \Throwable En cas d'erreur lors du traitement des fichiers
+     */
     public function index(Request $request): Response
     {
         $error = null;
@@ -109,7 +131,20 @@ class ImportWithDependenciesController extends AbstractController
     }
 
     /**
-     * Traite le fichier des employés
+     * Traite le fichier CSV des employés et extrait les données pour l'importation.
+     *
+     * @param UploadedFile $file Fichier CSV uploadé contenant les données des employés
+     * @param string $company Nom de l'entreprise pour lier les employés
+     * @return array Tableau des données d'employés formatées
+     * @throws \RuntimeException Si le fichier est invalide ou les données incomplètes
+     */
+    /**
+     * Traite le fichier CSV des employés et prépare les données pour l'importation.
+     *
+     * @param UploadedFile $file Fichier CSV uploadé contenant les données des employés
+     * @param string $company Nom de l'entreprise pour lier les employés
+     * @return array Tableau des données d'employés préparées pour l'importation
+     * @throws \RuntimeException Si le fichier est invalide ou les données incomplètes
      */
     private function processEmployeeFile(UploadedFile $file, string $company): array
     {
@@ -149,7 +184,12 @@ class ImportWithDependenciesController extends AbstractController
     }
 
     /**
-     * Traite le fichier des composants salariaux
+     * Traite le fichier CSV des composants salariaux et prépare les données pour l'importation.
+     *
+     * @param UploadedFile $file Fichier CSV uploadé contenant les composants salariaux
+     * @param string $company Nom de l'entreprise pour lier les composants
+     * @return array Tableau des composants salariaux préparés pour l'importation
+     * @throws \RuntimeException Si le fichier est invalide ou les données incomplètes
      */
     private function processComponentFile(UploadedFile $file, string $company): array
     {
@@ -182,7 +222,22 @@ class ImportWithDependenciesController extends AbstractController
     }
 
     /**
-     * Traite le fichier des bulletins de salaire
+     * Traite le fichier CSV des bulletins de salaire et extrait les données pour l'importation.
+     *
+     * @param UploadedFile $file Fichier CSV uploadé contenant les bulletins
+     * @param string $company Nom de l'entreprise pour lier les bulletins
+     * @param string $structureName Nom de la structure salariale à utiliser
+     * @return array Tableau des bulletins formatés
+     * @throws \RuntimeException Si le fichier est invalide ou les données incomplètes
+     */
+    /**
+     * Traite le fichier CSV des bulletins de salaire et prépare les données pour l'importation.
+     *
+     * @param UploadedFile $file Fichier CSV uploadé contenant les bulletins de salaire
+     * @param string $company Nom de l'entreprise pour lier les bulletins
+     * @param string $structureName Nom de la structure salariale à utiliser
+     * @return array Tableau des bulletins préparés pour l'importation
+     * @throws \RuntimeException Si le fichier est invalide ou les données incomplètes
      */
     private function processSlipFile(UploadedFile $file, string $company, string $structureName): array
     {
@@ -235,7 +290,18 @@ class ImportWithDependenciesController extends AbstractController
     }
 
     /**
-     * Convertit une date du format français (DD/MM/YYYY) au format ERPNext (YYYY-MM-DD)
+     * Convertit une date dans différents formats vers le format YYYY-MM-DD.
+     *
+     * @param string $date Date à convertir (supporte DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
+     * @return string Date au format YYYY-MM-DD
+     * @throws \InvalidArgumentException Si le format de date n'est pas reconnu
+     */
+    /**
+     * Convertit une date dans différents formats vers le format YYYY-MM-DD attendu par ERPNext.
+     *
+     * @param string $date Date à convertir (supporte DD/MM/YYYY, DD-MM-YYYY et YYYY-MM-DD)
+     * @return string Date au format YYYY-MM-DD
+     * @throws \InvalidArgumentException Si le format de date n'est pas reconnu
      */
     private function formatDate(string $date): string
     {

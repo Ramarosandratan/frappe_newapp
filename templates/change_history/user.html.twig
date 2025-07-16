@@ -1,0 +1,117 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Historique - Utilisateur {{ userId }}{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1><i class="fas fa-user-clock"></i> Historique des modifications</h1>
+            <p class="text-muted mb-0">
+                <strong>Utilisateur:</strong> <code>{{ userId }}</code>
+            </p>
+        </div>
+        <div>
+            <a href="{{ path('app_change_history_index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Retour à l'historique général
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i> Modifications effectuées
+                <span class="badge bg-secondary">{{ history|length }} modification(s)</span>
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if history %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Date/Heure</th>
+                                <th>Type d'entité</th>
+                                <th>Entité</th>
+                                <th>Champ</th>
+                                <th>Ancienne valeur</th>
+                                <th>Nouvelle valeur</th>
+                                <th>Action</th>
+                                <th>Raison</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for change in history %}
+                            <tr>
+                                <td>
+                                    <small>{{ change.changedAt|date('d/m/Y H:i:s') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ change.entityType }}</span>
+                                </td>
+                                <td>
+                                    <code>{{ change.entityId }}</code>
+                                </td>
+                                <td>
+                                    <strong>{{ change.fieldName }}</strong>
+                                </td>
+                                <td>
+                                    {% if change.oldValue %}
+                                        <span class="text-muted">{{ change.formattedOldValue }}</span>
+                                    {% else %}
+                                        <em class="text-muted">N/A</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if change.newValue %}
+                                        <span class="text-success">{{ change.formattedNewValue }}</span>
+                                    {% else %}
+                                        <em class="text-muted">N/A</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {{ change.actionBadgeClass }}">
+                                        {{ change.actionLabel }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if change.reason %}
+                                        <small>{{ change.reason }}</small>
+                                    {% else %}
+                                        <em class="text-muted">-</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ path('app_change_history_entity', {entityType: change.entityType, entityId: change.entityId|url_encode}) }}" 
+                                       class="btn btn-outline-primary btn-sm" title="Voir l'historique de cette entité">
+                                        <i class="fas fa-history"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-user-clock fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Aucune modification trouvée</h5>
+                    <p class="text-muted">Cet utilisateur n'a effectué aucune modification enregistrée.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if history|length >= limit %}
+    <div class="alert alert-info mt-3">
+        <i class="fas fa-info-circle"></i>
+        Seules les {{ limit }} dernières modifications sont affichées.
+        <a href="{{ path('app_change_history_index', {user_id: userId}) }}" class="alert-link">
+            Voir toutes les modifications de cet utilisateur
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

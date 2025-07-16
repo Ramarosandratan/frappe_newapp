@@ -3,28 +3,32 @@
 {% block title %}Détails de la fiche de paie{% endblock %}
 
 {% block body %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Fiche de paie</h1>
-        <div>
-            {% if payslip.name is defined and payslip.name is not empty %}
-                <a href="{{ path('app_payslip_pdf', {id: payslip.name|encode_id}) }}" 
-                   class="btn btn-danger" 
-                   target="_blank"
-                   title="Ouvrir le PDF dans un nouvel onglet">
-                    <i class="fas fa-file-pdf"></i> Exporter en PDF
-                </a>
-            {% else %}
-                <button class="btn btn-danger" disabled title="ID de fiche de paie non disponible">
-                    <i class="fas fa-file-pdf"></i> Exporter en PDF
-                </button>
-            {% endif %}
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-file-invoice-dollar me-3"></i>Fiche de paie</h1>
+                <p>Détails complets de la fiche de paie pour {{ payslip.employee_name ?? 'N/A' }}.</p>
+            </div>
+            <div>
+                {% if payslip.name is defined and payslip.name is not empty %}
+                    <a href="{{ path('app_payslip_pdf', {id: payslip.name|encode_id}) }}" 
+                       class="btn btn-light" 
+                       target="_blank"
+                       title="Ouvrir le PDF dans un nouvel onglet">
+                        <i class="fas fa-file-pdf me-2"></i>Exporter en PDF
+                    </a>
+                {% else %}
+                    <button class="btn btn-light" disabled title="ID de fiche de paie non disponible">
+                        <i class="fas fa-file-pdf me-2"></i>Exporter en PDF
+                    </button>
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <div class="card mb-4">
-        <div class="card-header bg-primary text-white">
-            <h2 class="mb-0">{{ payslip.employee_name ?? 'N/A' }}</h2>
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-user me-2"></i>{{ payslip.employee_name ?? 'N/A' }}</h5>
         </div>
         <div class="card-body">
             <div class="row">
@@ -56,15 +60,21 @@
     <div class="row">
         <div class="col-md-6">
             <div class="card h-100">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h3 class="mb-0"><i class="fas fa-plus-circle"></i> Gains</h3>
+                    <button class="btn btn-sm btn-light" id="editBaseSalaryBtn" title="Modifier le salaire de base">
+                        <i class="fas fa-edit"></i>
+                    </button>
                 </div>
                 {% if payslip.earnings and payslip.earnings|length > 0 %}
                     <ul class="list-group list-group-flush">
                         {% for earning in payslip.earnings %}
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 <span>{{ earning.salary_component ?? 'N/A' }}</span>
-                                <span class="badge bg-success rounded-pill amount">
+                                <span class="badge bg-success rounded-pill amount" 
+                                      {% if earning.salary_component == 'Salaire de base' or earning.salary_component == 'Salaire Base' %}
+                                      id="base-salary-amount" data-original-amount="{{ earning.amount }}"
+                                      {% endif %}>
                                     {% if earning.amount is not null %}
                                         {{ earning.amount|number_format(2, ',', ' ') }} €
                                     {% else %}
@@ -161,6 +171,75 @@
         </div>
     </div>
 
+    <!-- Historique des modifications -->
+    {% if history and history|length > 0 %}
+    <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-history"></i> Historique des modifications récentes</h5>
+            <a href="{{ path('app_change_history_entity', {entityType: 'Salary Slip', entityId: payslip.name|url_encode}) }}" 
+               class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-eye"></i> Voir tout l'historique
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Champ modifié</th>
+                            <th>Ancienne valeur</th>
+                            <th>Nouvelle valeur</th>
+                            <th>Utilisateur</th>
+                            <th>Raison</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for change in history %}
+                        <tr>
+                            <td>
+                                <small>{{ change.changedAt|date('d/m/Y H:i') }}</small>
+                            </td>
+                            <td>
+                                <strong>{{ change.fieldName }}</strong>
+                            </td>
+                            <td>
+                                {% if change.oldValue %}
+                                    <span class="text-muted">{{ change.formattedOldValue }}</span>
+                                {% else %}
+                                    <em class="text-muted">-</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if change.newValue %}
+                                    <span class="text-success">{{ change.formattedNewValue }}</span>
+                                {% else %}
+                                    <em class="text-muted">-</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if change.userName %}
+                                    <small>{{ change.userName }}</small>
+                                {% else %}
+                                    <em class="text-muted">Système</em>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if change.reason %}
+                                    <small class="text-muted">{{ change.reason }}</small>
+                                {% else %}
+                                    <em class="text-muted">-</em>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="mt-4 d-flex gap-2 flex-wrap">
         {% if payslip.employee %}
             <a href="{{ path('app_employee_detail', {id: payslip.employee}) }}" class="btn btn-secondary">
@@ -170,6 +249,150 @@
         <a href="{{ path('app_employee_list') }}" class="btn btn-outline-secondary">
             <i class="fas fa-list"></i> Liste des employés
         </a>
+        <a href="{{ path('app_change_history_index') }}" class="btn btn-outline-info">
+            <i class="fas fa-history"></i> Historique général
+        </a>
+    </div>
+
+<!-- Modal pour modifier le salaire de base -->
+<div class="modal fade" id="editBaseSalaryModal" tabindex="-1" aria-labelledby="editBaseSalaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editBaseSalaryModalLabel">
+                    <i class="fas fa-edit"></i> Modifier le salaire de base
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editBaseSalaryForm">
+                    <div class="mb-3">
+                        <label for="baseSalaryInput" class="form-label">Nouveau salaire de base (€)</label>
+                        <input type="number" class="form-control" id="baseSalaryInput" 
+                               step="0.01" min="0" required>
+                        <div class="form-text">
+                            Montant actuel: <span id="currentBaseSalary">0,00 €</span>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        La modification du salaire de base recalculera automatiquement les autres composants de salaire (indemnités, etc.).
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="saveBaseSalaryBtn">
+                    <i class="fas fa-save"></i> Enregistrer
+                </button>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const editBtn = document.getElementById('editBaseSalaryBtn');
+    const modal = new bootstrap.Modal(document.getElementById('editBaseSalaryModal'));
+    const form = document.getElementById('editBaseSalaryForm');
+    const input = document.getElementById('baseSalaryInput');
+    const saveBtn = document.getElementById('saveBaseSalaryBtn');
+    const currentSalarySpan = document.getElementById('currentBaseSalary');
+    const baseSalaryAmountElement = document.getElementById('base-salary-amount');
+    
+    // Ouvrir la modal
+    editBtn.addEventListener('click', function() {
+        if (baseSalaryAmountElement) {
+            const currentAmount = baseSalaryAmountElement.dataset.originalAmount || '0';
+            input.value = parseFloat(currentAmount);
+            currentSalarySpan.textContent = parseFloat(currentAmount).toLocaleString('fr-FR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }) + ' €';
+        }
+        modal.show();
+    });
+    
+    // Sauvegarder les modifications
+    saveBtn.addEventListener('click', function() {
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        const newBaseSalary = parseFloat(input.value);
+        
+        if (newBaseSalary <= 0) {
+            alert('Le montant du salaire de base doit être positif');
+            return;
+        }
+        
+        // Désactiver le bouton pendant la requête
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enregistrement...';
+        
+        // Envoyer la requête AJAX
+        const requestUrl = '{{ path('app_payslip_update_base_salary', {id: payslip.name|encode_id}) }}';
+        const requestData = {
+            base_salary: newBaseSalary
+        };
+        
+        console.log('Envoi de la requête de mise à jour:', {
+            url: requestUrl,
+            data: requestData,
+            payslip_id: '{{ payslip.name|encode_id }}',
+            decoded_id: '{{ payslip.name }}'
+        });
+        
+        fetch(requestUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Afficher un message de succès
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                alertDiv.innerHTML = `
+                    <i class="fas fa-check-circle"></i> ${data.message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').firstChild);
+                
+                // Fermer la modal
+                modal.hide();
+                
+                // Recharger la page pour afficher les nouveaux montants
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                alert('Erreur: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Erreur détaillée:', {
+                error: error,
+                message: error.message,
+                stack: error.stack,
+                url: '{{ path('app_payslip_update_base_salary', {id: payslip.name|encode_id}) }}',
+                payslip_id: '{{ payslip.name|encode_id }}',
+                base_salary: newBaseSalary
+            });
+            alert('Une erreur est survenue lors de la mise à jour du salaire de base. Consultez la console pour plus de détails.');
+        })
+        .finally(() => {
+            // Réactiver le bouton
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Enregistrer';
+        });
+    });
+});
+</script>
+
 {% endblock %}

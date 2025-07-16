@@ -1,0 +1,713 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Confirmation d'importation CSV{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1>Confirmation d'importation CSV</h1>
+    
+    {% for label, messages in app.flashes %}
+        {% for message in messages %}
+            <div class="alert alert-{{ label }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endfor %}
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Résumé de l'analyse des fichiers</h3>
+                    <small class="text-muted">Analysé le {{ analysis.analysis_time }}</small>
+                </div>
+                <div class="card-body">
+                    <!-- Résumé global avec statistiques détaillées -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body text-center">
+                                    <h3>{{ analysis.total_records }}</h3>
+                                    <p class="mb-0">Total des lignes</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body text-center">
+                                    <h3>{{ analysis.employees.valid_records + analysis.structures.valid_records + analysis.salary_data.valid_records }}</h3>
+                                    <p class="mb-0">Lignes valides</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body text-center">
+                                    <h3>{{ analysis.employees.invalid_records + analysis.structures.invalid_records + analysis.salary_data.invalid_records }}</h3>
+                                    <p class="mb-0">Lignes avec erreurs</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-info text-white">
+                                <div class="card-body text-center">
+                                    <h3>3</h3>
+                                    <p class="mb-0">Fichiers analysés</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle"></i> Résumé de l'importation</h5>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Employés à traiter :</strong> {{ analysis.employees.record_count }} lignes
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Composants salariaux :</strong> {{ analysis.structures.record_count }} lignes
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Données salariales :</strong> {{ analysis.salary_data.record_count }} lignes
+                            </div>
+                            <div class="col-md-3">
+                                <strong>Durée estimée :</strong> ~{{ analysis.estimated_duration }} minute(s)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analyse des relations entre fichiers -->
+                    {% if analysis.cross_file_analysis is defined %}
+                    <div class="mb-4">
+                        <h4><i class="fas fa-link"></i> Analyse des relations entre fichiers</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-success">{{ analysis.cross_file_analysis.employee_salary_match }}</h5>
+                                            <small class="text-muted">Employés avec données salariales</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-info">{{ analysis.cross_file_analysis.structure_salary_match }}</h5>
+                                            <small class="text-muted">Structures utilisées</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center">
+                                            <h5 class="text-warning">{{ analysis.cross_file_analysis.warnings|length }}</h5>
+                                            <small class="text-muted">Avertissements détectés</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% if analysis.cross_file_analysis.warnings|length > 0 %}
+                                <div class="alert alert-warning mt-3">
+                                    <h6><i class="fas fa-exclamation-triangle"></i> Avertissements de cohérence :</h6>
+                                    <ul class="mb-0">
+                                        {% for warning in analysis.cross_file_analysis.warnings %}
+                                        <li>{{ warning }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                {% if analysis.cross_file_analysis.missing_employees|length > 0 %}
+                                <div class="alert alert-danger mt-3">
+                                    <h6><i class="fas fa-user-times"></i> Employés manquants :</h6>
+                                    <p>Les employés suivants sont référencés dans les données salariales mais ne sont pas définis dans le fichier employés :</p>
+                                    <div class="d-flex flex-wrap">
+                                        {% for employee in analysis.cross_file_analysis.missing_employees %}
+                                        <span class="badge bg-danger me-1 mb-1">{{ employee }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if analysis.cross_file_analysis.orphaned_structures|length > 0 %}
+                                <div class="alert alert-warning mt-3">
+                                    <h6><i class="fas fa-cog"></i> Structures non définies :</h6>
+                                    <p>Les structures salariales suivantes sont utilisées dans les données mais ne sont pas définies :</p>
+                                    <div class="d-flex flex-wrap">
+                                        {% for structure in analysis.cross_file_analysis.orphaned_structures %}
+                                        <span class="badge bg-warning me-1 mb-1">{{ structure }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Analyse du fichier des employés -->
+                    <div class="mb-4">
+                        <h4><i class="fas fa-users"></i> Fichier des employés</h4>
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <strong>{{ analysis.employees.filename }}</strong>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <span class="badge bg-primary">{{ analysis.employees.record_count }} lignes à insérer</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements valides :</span>
+                                                <span class="badge bg-success">{{ analysis.employees.valid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% if analysis.employees.invalid_records > 0 %}
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements invalides :</span>
+                                                <span class="badge bg-danger">{{ analysis.employees.invalid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div class="progress mb-3">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (analysis.employees.valid_records / analysis.employees.record_count * 100)|round }}%">
+                                                {{ (analysis.employees.valid_records / analysis.employees.record_count * 100)|round }}% valides
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if analysis.employees.companies|length > 0 %}
+                                        <p><strong>Entreprises trouvées ({{ analysis.employees.companies|length }}) :</strong></p>
+                                        <ul class="list-unstyled">
+                                            {% for company in analysis.employees.companies %}
+                                            <li><i class="fas fa-building text-muted"></i> {{ company }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if analysis.employees.missing_fields|length > 0 %}
+                                <div class="alert alert-danger">
+                                    <strong>Champs requis manquants :</strong>
+                                    {{ analysis.employees.missing_fields|join(', ') }}
+                                </div>
+                                {% endif %}
+                                
+                                {% if analysis.employees.errors|length > 0 %}
+                                <div class="alert alert-warning">
+                                    <strong>Erreurs détectées :</strong>
+                                    <ul class="mb-0">
+                                        {% for error in analysis.employees.errors %}
+                                        <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analyse du fichier des structures salariales -->
+                    <div class="mb-4">
+                        <h4><i class="fas fa-cogs"></i> Fichier des structures salariales</h4>
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <strong>{{ analysis.structures.filename }}</strong>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <span class="badge bg-primary">{{ analysis.structures.record_count }} lignes à insérer</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements valides :</span>
+                                                <span class="badge bg-success">{{ analysis.structures.valid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% if analysis.structures.invalid_records > 0 %}
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements invalides :</span>
+                                                <span class="badge bg-danger">{{ analysis.structures.invalid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div class="progress mb-3">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (analysis.structures.valid_records / analysis.structures.record_count * 100)|round }}%">
+                                                {{ (analysis.structures.valid_records / analysis.structures.record_count * 100)|round }}% valides
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if analysis.structures.structures|length > 0 %}
+                                        <p><strong>Structures salariales trouvées ({{ analysis.structures.structures|length }}) :</strong></p>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Structure</th>
+                                                        <th>Composants</th>
+                                                        <th>Gains</th>
+                                                        <th>Déductions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for name, details in analysis.structures.structures %}
+                                                    <tr>
+                                                        <td><i class="fas fa-cog text-muted"></i> {{ name }}</td>
+                                                        <td><span class="badge bg-info">{{ details.components }}</span></td>
+                                                        <td><span class="badge bg-success">{{ details.earnings }}</span></td>
+                                                        <td><span class="badge bg-warning">{{ details.deductions }}</span></td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if analysis.structures.missing_fields|length > 0 %}
+                                <div class="alert alert-danger">
+                                    <strong>Champs requis manquants :</strong>
+                                    {{ analysis.structures.missing_fields|join(', ') }}
+                                </div>
+                                {% endif %}
+                                
+                                {% if analysis.structures.errors|length > 0 %}
+                                <div class="alert alert-warning">
+                                    <strong>Erreurs détectées :</strong>
+                                    <ul class="mb-0">
+                                        {% for error in analysis.structures.errors %}
+                                        <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Analyse du fichier des données salariales -->
+                    <div class="mb-4">
+                        <h4><i class="fas fa-money-bill-wave"></i> Fichier des données salariales</h4>
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <strong>{{ analysis.salary_data.filename }}</strong>
+                                    </div>
+                                    <div class="col-md-4 text-end">
+                                        <span class="badge bg-primary">{{ analysis.salary_data.record_count }} lignes à insérer</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements valides :</span>
+                                                <span class="badge bg-success">{{ analysis.salary_data.valid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% if analysis.salary_data.invalid_records > 0 %}
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between">
+                                                <span>Enregistrements invalides :</span>
+                                                <span class="badge bg-danger">{{ analysis.salary_data.invalid_records }}</span>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                        <div class="progress mb-3">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (analysis.salary_data.valid_records / analysis.salary_data.record_count * 100)|round }}%">
+                                                {{ (analysis.salary_data.valid_records / analysis.salary_data.record_count * 100)|round }}% valides
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h5 class="text-primary">{{ analysis.salary_data.employees|length }}</h5>
+                                                    <small class="text-muted">Employés uniques</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h5 class="text-info">{{ analysis.salary_data.months|length }}</h5>
+                                                    <small class="text-muted">Mois traités</small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="text-center">
+                                                    <h5 class="text-warning">{{ analysis.salary_data.structures|length }}</h5>
+                                                    <small class="text-muted">Structures utilisées</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if analysis.salary_data.months|length > 0 %}
+                                        <div class="mt-3">
+                                            <p><strong>Périodes de paie :</strong></p>
+                                            <div class="d-flex flex-wrap">
+                                                {% for month in analysis.salary_data.months %}
+                                                <span class="badge bg-light text-dark me-1 mb-1">{{ month }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                {% if analysis.salary_data.missing_fields|length > 0 %}
+                                <div class="alert alert-danger">
+                                    <strong>Champs requis manquants :</strong>
+                                    {{ analysis.salary_data.missing_fields|join(', ') }}
+                                </div>
+                                {% endif %}
+                                
+                                {% if analysis.salary_data.errors|length > 0 %}
+                                <div class="alert alert-warning">
+                                    <strong>Erreurs détectées :</strong>
+                                    <ul class="mb-0">
+                                        {% for error in analysis.salary_data.errors %}
+                                        <li>{{ error }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+
+                                <!-- Statistiques salariales détaillées -->
+                                {% if analysis.salary_data.salary_stats is defined and analysis.salary_data.salary_stats|length > 0 %}
+                                <div class="mt-4">
+                                    <h5><i class="fas fa-chart-bar"></i> Statistiques salariales</h5>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="card bg-success text-white">
+                                                <div class="card-body text-center">
+                                                    <h6>{{ analysis.salary_data.salary_stats.total_amount|number_format(0, ',', ' ') }} €</h6>
+                                                    <small>Montant total</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-info text-white">
+                                                <div class="card-body text-center">
+                                                    <h6>{{ analysis.salary_data.salary_stats.avg_salary|number_format(0, ',', ' ') }} €</h6>
+                                                    <small>Salaire moyen</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-warning text-white">
+                                                <div class="card-body text-center">
+                                                    <h6>{{ analysis.salary_data.salary_stats.min_salary|number_format(0, ',', ' ') }} €</h6>
+                                                    <small>Salaire minimum</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="card bg-danger text-white">
+                                                <div class="card-body text-center">
+                                                    <h6>{{ analysis.salary_data.salary_stats.max_salary|number_format(0, ',', ' ') }} €</h6>
+                                                    <small>Salaire maximum</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Détail des salaires par employé -->
+                                {% if analysis.salary_data.employee_salaries is defined and analysis.salary_data.employee_salaries|length > 0 %}
+                                <div class="mt-4">
+                                    <h5><i class="fas fa-users"></i> Nombre de salaires par employé</h5>
+                                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                        <table class="table table-sm table-striped">
+                                            <thead class="table-dark sticky-top">
+                                                <tr>
+                                                    <th>Référence employé</th>
+                                                    <th class="text-center">Nombre de salaires</th>
+                                                    <th class="text-end">Montant total</th>
+                                                    <th class="text-end">Montant moyen</th>
+                                                    <th>Périodes</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for employee_ref, salary_info in analysis.salary_data.employee_salaries %}
+                                                <tr>
+                                                    <td><strong>{{ employee_ref }}</strong></td>
+                                                    <td class="text-center">
+                                                        <span class="badge bg-primary">{{ salary_info.count }}</span>
+                                                    </td>
+                                                    <td class="text-end">{{ salary_info.total_amount|number_format(0, ',', ' ') }} €</td>
+                                                    <td class="text-end">{{ (salary_info.total_amount / salary_info.count)|number_format(0, ',', ' ') }} €</td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap">
+                                                            {% for month in salary_info.months|slice(0, 3) %}
+                                                            <span class="badge bg-light text-dark me-1 mb-1" style="font-size: 0.7em;">{{ month }}</span>
+                                                            {% endfor %}
+                                                            {% if salary_info.months|length > 3 %}
+                                                            <span class="badge bg-secondary" style="font-size: 0.7em;">+{{ salary_info.months|length - 3 }}</span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="text-muted mt-2">
+                                        <small><i class="fas fa-info-circle"></i> Total : {{ analysis.salary_data.employee_salaries|length }} employé(s) avec des données salariales</small>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vérification des erreurs critiques -->
+                    {% set has_critical_errors = false %}
+                    {% set has_blocking_warnings = false %}
+                    
+                    {% if analysis.employees.missing_fields|length > 0 or analysis.structures.missing_fields|length > 0 or analysis.salary_data.missing_fields|length > 0 %}
+                        {% set has_critical_errors = true %}
+                    {% endif %}
+                    
+                    {% if analysis.cross_file_analysis is defined and analysis.cross_file_analysis.missing_employees|length > 0 %}
+                        {% set has_blocking_warnings = true %}
+                    {% endif %}
+
+                    <!-- Résumé des actions à effectuer -->
+                    {% if not has_critical_errors %}
+                    <div class="mb-4">
+                        <h4><i class="fas fa-tasks"></i> Actions qui seront effectuées</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-user-plus fa-2x text-primary mb-2"></i>
+                                                <h6>Employés</h6>
+                                                <p class="mb-0">{{ analysis.employees.valid_records }} employés seront créés ou mis à jour</p>
+                                                <small class="text-muted">{{ analysis.employees.companies|length }} entreprise(s)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-cogs fa-2x text-info mb-2"></i>
+                                                <h6>Structures salariales</h6>
+                                                <p class="mb-0">{{ analysis.structures.structures|length }} structure(s) avec {{ analysis.structures.valid_records }} composants</p>
+                                                <small class="text-muted">Gains et déductions</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-money-bill-wave fa-2x text-success mb-2"></i>
+                                                <h6>Fiches de paie</h6>
+                                                <p class="mb-0">{{ analysis.salary_data.valid_records }} fiche(s) de paie seront générées</p>
+                                                <small class="text-muted">{{ analysis.salary_data.months|length }} période(s)</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if has_critical_errors %}
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Erreurs critiques détectées</h5>
+                        <p>Des champs requis sont manquants dans un ou plusieurs fichiers. L'importation ne peut pas continuer.</p>
+                        <p>Veuillez corriger les fichiers et recommencer l'analyse.</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Boutons d'action -->
+                    <div class="mt-4">
+                        {% if not has_critical_errors and not has_blocking_warnings %}
+                        <div class="card border-success">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="fas fa-check-circle"></i> Prêt pour l'importation</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <h6><i class="fas fa-info-circle"></i> Informations importantes :</h6>
+                                    <ul class="mb-0">
+                                        <li>L'importation va traiter <strong>{{ analysis.total_records }} enregistrements</strong></li>
+                                        <li>Durée estimée : <strong>~{{ analysis.estimated_duration }} minute(s)</strong></li>
+                                        <li>Une fois confirmée, <strong>l'importation ne peut pas être annulée</strong></li>
+                                        <li>Assurez-vous que les données sont correctes avant de continuer</li>
+                                    </ul>
+                                </div>
+                                
+                                <form method="post" class="text-center" 
+                                      data-controller="import-confirmation" 
+                                      data-import-confirmation-target="form">
+                                    <button type="submit" name="action" value="confirm" 
+                                            class="btn btn-success btn-lg me-3"
+                                            data-import-confirmation-target="confirmButton"
+                                            data-action="click->import-confirmation#confirm">
+                                        <i class="fas fa-upload"></i> Confirmer et lancer l'importation
+                                        <br><small>({{ analysis.total_records }} lignes en ~{{ analysis.estimated_duration }}min)</small>
+                                    </button>
+                                    <button type="submit" name="action" value="cancel" 
+                                            class="btn btn-outline-secondary btn-lg"
+                                            data-import-confirmation-target="cancelButton"
+                                            data-action="click->import-confirmation#cancel">
+                                        <i class="fas fa-times"></i> Annuler et retourner
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% elseif has_blocking_warnings and not has_critical_errors %}
+                        <div class="card border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Avertissements détectés</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-warning">
+                                    <p><strong>Des incohérences ont été détectées entre vos fichiers.</strong></p>
+                                    <p>Vous pouvez continuer l'importation, mais certaines données pourraient être ignorées ou causer des erreurs.</p>
+                                </div>
+                                
+                                <form method="post" class="text-center" 
+                                      data-controller="import-confirmation" 
+                                      data-import-confirmation-target="form">
+                                    <button type="submit" name="action" value="confirm" 
+                                            class="btn btn-warning btn-lg me-3"
+                                            data-import-confirmation-target="confirmButton"
+                                            data-action="click->import-confirmation#confirm">
+                                        <i class="fas fa-exclamation-triangle"></i> Continuer malgré les avertissements
+                                        <br><small>({{ analysis.total_records }} lignes)</small>
+                                    </button>
+                                    <button type="submit" name="action" value="cancel" 
+                                            class="btn btn-outline-secondary btn-lg"
+                                            data-import-confirmation-target="cancelButton"
+                                            data-action="click->import-confirmation#cancel">
+                                        <i class="fas fa-times"></i> Annuler et corriger
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="card border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Importation impossible</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Des erreurs critiques empêchent l'importation. Veuillez corriger les fichiers et recommencer.</p>
+                                <form method="post" class="text-center">
+                                    <button type="submit" name="action" value="cancel" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-arrow-left"></i> Retourner à l'importation
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.badge {
+    font-size: 0.9em;
+}
+.card {
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.alert ul {
+    margin-bottom: 0;
+}
+.progress {
+    height: 20px;
+}
+.progress-bar {
+    font-size: 0.8em;
+    line-height: 20px;
+}
+.card-header {
+    font-weight: 500;
+}
+.table-responsive {
+    max-height: 200px;
+    overflow-y: auto;
+}
+.btn-lg small {
+    font-size: 0.7em;
+    opacity: 0.8;
+}
+.text-center h5 {
+    margin-bottom: 0.25rem;
+}
+.bg-primary.text-white .card-body {
+    background: rgba(255,255,255,0.1);
+}
+.bg-success.text-white .card-body {
+    background: rgba(255,255,255,0.1);
+}
+.bg-warning.text-white .card-body {
+    background: rgba(255,255,255,0.1);
+}
+.bg-info.text-white .card-body {
+    background: rgba(255,255,255,0.1);
+}
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+}
+.btn-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.1);
+    border-radius: inherit;
+}
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+.d-flex.align-items-center {
+    align-items: center !important;
+}
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+</style>
+{% endblock %}

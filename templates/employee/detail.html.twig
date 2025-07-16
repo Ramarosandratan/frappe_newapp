@@ -3,12 +3,16 @@
 {% block title %}Détails de l'employé{% endblock %}
 
 {% block body %}
-<div class="container mt-4">
+    <div class="page-header">
+        <h1><i class="fas fa-user me-3"></i>{{ employee.employee_name ?? 'N/A' }}</h1>
+        <p>Détails complets de l'employé et historique des fiches de paie.</p>
+    </div>
+
     <div class="row">
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h1 class="mb-0">{{ employee.employee_name ?? 'N/A' }}</h1>
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Informations personnelles</h5>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -34,7 +38,7 @@
 
     <div class="card mt-4">
         <div class="card-header">
-            <h2 class="mb-0">Fiches de paie</h2>
+            <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Fiches de paie</h5>
         </div>
         <div class="card-body">
             {% if salary_slips and salary_slips|length > 0 %}
@@ -108,8 +112,7 @@
 
     <div class="mt-4">
         <a href="{{ path('app_employee_list') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Retour à la liste
+            <i class="fas fa-arrow-left me-2"></i>Retour à la liste
         </a>
     </div>
-</div>
 {% endblock %}

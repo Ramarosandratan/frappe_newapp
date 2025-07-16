@@ -1,0 +1,4 @@
+change_history:
+    resource: App\Controller\ChangeHistoryController
+    type: attribute
+    prefix: /history

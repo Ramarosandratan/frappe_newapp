@@ -3,12 +3,14 @@
 {% block title %}Modification des éléments de salaire{% endblock %}
 
 {% block body %}
-<div class="container mt-4">
-    <h1>Modification des éléments de salaire</h1>
+    <div class="page-header">
+        <h1><i class="fas fa-edit me-3"></i>Modification des éléments de salaire</h1>
+        <p>Modifiez les composants de salaire selon des critères spécifiques pour vos employés.</p>
+    </div>
     
     <div class="card">
         <div class="card-header">
-            <h2>Définir les critères de modification</h2>
+            <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Définir les critères de modification</h5>
         </div>
         <div class="card-body">
             <form method="post">
@@ -141,7 +143,6 @@
             </ul>
         </div>
     </div>
-</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

@@ -68,6 +68,7 @@ class User implements UserInterface
     /**
      * @see UserInterface
      */
+    #[\Deprecated]
     public function eraseCredentials(): void
     {
         // If you store any temporary, sensitive data on the user, clear it here
@@ -82,5 +83,27 @@ class User implements UserInterface
     public function getUserIdentifier(): string
     {
         return (string) $this->email;
+    }
+
+    /**
+     * Sérialisation pour la session
+     */
+    public function __serialize(): array
+    {
+        return [
+            'email' => $this->email,
+            'fullName' => $this->fullName,
+            'roles' => $this->roles,
+        ];
+    }
+
+    /**
+     * Désérialisation depuis la session
+     */
+    public function __unserialize(array $data): void
+    {
+        $this->email = $data['email'];
+        $this->fullName = $data['fullName'];
+        $this->roles = $data['roles'] ?? [];
     }
 }

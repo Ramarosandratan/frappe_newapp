@@ -3,12 +3,27 @@
 {% block title %}Accueil - ERPNext Integration{% endblock %}
 
 {% block body %}
-<div class="container mt-4">
-    <div class="jumbotron bg-light p-5 rounded">
-        <h1 class="display-4">Bienvenue dans l'application de gestion des salaires</h1>
-        <p class="lead">Cette application vous permet de gérer les employés, les structures salariales et les fiches de paie en intégration avec ERPNext.</p>
-        <hr class="my-4">
-        <p>Utilisez le menu de navigation pour accéder aux différentes fonctionnalités.</p>
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="display-4 fw-bold">
+                    <i class="fas fa-home me-3"></i>
+                    Bienvenue{% if app.user %}, {{ app.user.userIdentifier }}{% endif %} !
+                </h1>
+                <p class="lead mb-3">
+                    Tableau de bord de gestion des salaires et des employés
+                </p>
+                <p class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Utilisez le menu de navigation pour accéder aux différentes fonctionnalités de l'application.
+                </p>
+            </div>
+            <div class="col-md-4 text-center">
+                <div class="bg-white bg-opacity-20 rounded-circle p-4 d-inline-block">
+                    <i class="fas fa-chart-line fa-4x"></i>
+                </div>
+            </div>
+        </div>
     </div>
     
     {% if error is defined %}
@@ -52,9 +67,19 @@
                 <div class="card text-white bg-warning mb-3">
                     <div class="card-header">Total des salaires ({{ currentMonth|date('F Y') }})</div>
                     <div class="card-body">
-                        <h5 class="card-title">{{ totalNetPay|number_format(2, ',', ' ') }}</h5>
+                        <h5 class="card-title">{{ totalNetPay|number_format(2, ',', ' ') }} €</h5>
                         <p class="card-text">Total des salaires nets</p>
                         <a href="{{ path('app_stats') }}" class="btn btn-light btn-sm">Voir les statistiques</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-secondary mb-3">
+                    <div class="card-header">Modifications (Aujourd'hui)</div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ todayModifications }}</h5>
+                        <p class="card-text">Modifications effectuées</p>
+                        <a href="{{ path('app_change_history_index') }}" class="btn btn-light btn-sm">Voir l'historique</a>
                     </div>
                 </div>
             </div>
@@ -80,29 +105,67 @@
                                 </div>
                                 <p class="mb-1">Modifier en masse des éléments de salaire selon des conditions spécifiques.</p>
                             </a>
+                            <a href="{{ path('app_change_history_index') }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1"><i class="fas fa-history"></i> Historique des modifications</h5>
+                                </div>
+                                <p class="mb-1">Consulter l'historique complet de toutes les modifications effectuées dans le système.</p>
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header">
-                        <h5>Documentation</h5>
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-clock"></i> Modifications récentes</h5>
+                        <a href="{{ path('app_change_history_index') }}" class="btn btn-outline-primary btn-sm">
+                            Voir tout
+                        </a>
                     </div>
-                    <div class="card-body">
-                        <h5 class="card-title">Fonctionnalités principales</h5>
-                        <ul>
-                            <li><strong>Import de fichiers CSV</strong> : Importez des employés, des structures salariales et des données de salaire.</li>
-                            <li><strong>Gestion des employés</strong> : Consultez la liste des employés et leurs fiches de paie.</li>
-                            <li><strong>Fiches de paie</strong> : Consultez et exportez les fiches de paie en PDF.</li>
-                            <li><strong>Statistiques</strong> : Consultez les statistiques des salaires par mois et par composant.</li>
-                            <li><strong>Génération de salaires</strong> : Générez automatiquement des fiches de paie pour une période donnée.</li>
-                            <li><strong>Modification des éléments de salaire</strong> : Modifiez en masse des éléments de salaire selon des conditions spécifiques.</li>
-                        </ul>
+                    <div class="card-body p-0">
+                        {% if recentHistory and recentHistory|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Champ</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for change in recentHistory %}
+                                        <tr>
+                                            <td>
+                                                <small>{{ change.changedAt|date('d/m H:i') }}</small>
+                                            </td>
+                                            <td>
+                                                <small class="badge bg-light text-dark">{{ change.entityType }}</small>
+                                            </td>
+                                            <td>
+                                                <small><strong>{{ change.fieldName }}</strong></small>
+                                            </td>
+                                            <td>
+                                                <span class="badge {{ change.actionBadgeClass }} badge-sm">
+                                                    {{ change.actionLabel }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="text-center py-3">
+                                <i class="fas fa-history fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">Aucune modification récente</p>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
     {% endif %}
-</div>
 {% endblock %}

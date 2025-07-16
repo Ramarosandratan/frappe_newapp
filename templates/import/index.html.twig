@@ -1,25 +1,109 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Import CSV{% endblock %}
+{% block title %}Importation CSV{% endblock %}
 
 {% block body %}
-<div class="container">
-    <h1>Import CSV Files</h1>
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="fas fa-file-csv me-3"></i>Importation de fichiers CSV</h1>
+                <p>Téléchargez vos fichiers CSV pour importer les employés, structures salariales et données de paie.</p>
+            </div>
+            <div>
+                <a href="{{ path('app_import_help') }}" class="btn btn-light">
+                    <i class="fas fa-question-circle me-2"></i>Guide des formats
+                </a>
+            </div>
+        </div>
+    </div>
 
     {% for label, messages in app.flashes %}
         {% for message in messages %}
-            <div class="alert alert-{{ label }}">
+            <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
                 {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endfor %}
     {% endfor %}
 
-    {{ form_start(form, {'attr': {'id': 'csv-import-form'}}) }}
-    {{ form_widget(form._token) }}
-    {{ form_row(form.employee_file) }}
-    {{ form_row(form.structure_file) }}
-    {{ form_row(form.data_file) }}
-    <button type="submit" class="btn btn-primary">Import All</button>
-    {{ form_end(form, {'render_rest': true}) }}
-</div>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Sélection des fichiers</h3>
+                </div>
+                <div class="card-body">
+                    {{ form_start(form, {'attr': {'id': 'csv-import-form', 'enctype': 'multipart/form-data'}}) }}
+                    {{ form_widget(form._token) }}
+                    
+                    <div class="mb-3">
+                        {{ form_label(form.employee_file, 'Fichier des employés', {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.employee_file, {'attr': {'class': 'form-control', 'accept': '.csv'}}) }}
+                        {{ form_errors(form.employee_file) }}
+                        <div class="form-text">Format attendu : Ref, Nom, Prenom, genre, Date embauche, date naissance, company</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form_label(form.structure_file, 'Fichier des structures salariales', {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.structure_file, {'attr': {'class': 'form-control', 'accept': '.csv'}}) }}
+                        {{ form_errors(form.structure_file) }}
+                        <div class="form-text">Format attendu : salary structure, name, Abbr, type, valeur, company</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form_label(form.data_file, 'Fichier des données salariales', {'label_attr': {'class': 'form-label'}}) }}
+                        {{ form_widget(form.data_file, {'attr': {'class': 'form-control', 'accept': '.csv'}}) }}
+                        {{ form_errors(form.data_file) }}
+                        <div class="form-text">Format attendu : Mois, Ref Employe, Salaire Base, Salaire</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-search"></i> Analyser les fichiers
+                        </button>
+                    </div>
+                    
+                    {{ form_end(form, {'render_rest': false}) }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Instructions</h4>
+                </div>
+                <div class="card-body">
+                    <h5>Processus d'importation</h5>
+                    <ol>
+                        <li><strong>Analyse</strong> : Les fichiers sont analysés pour vérifier leur format et contenu</li>
+                        <li><strong>Confirmation</strong> : Un résumé détaillé vous est présenté</li>
+                        <li><strong>Importation</strong> : Les données sont importées dans ERPNext</li>
+                    </ol>
+                    
+                    <h5>Formats de fichiers</h5>
+                    <ul>
+                        <li>Format : CSV avec séparateur virgule</li>
+                        <li>Encodage : UTF-8 recommandé</li>
+                        <li>Première ligne : En-têtes de colonnes</li>
+                        <li>Taille max : 5 MB par fichier</li>
+                    </ul>
+                    
+                    <div class="alert alert-info">
+                        <small><i class="fas fa-info-circle"></i> Les fichiers seront analysés avant l'importation pour détecter les erreurs potentielles.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<style>
+.form-text {
+    font-size: 0.875em;
+    color: #6c757d;
+}
+.card {
+    margin-bottom: 1rem;
+}
+</style>
 {% endblock %}

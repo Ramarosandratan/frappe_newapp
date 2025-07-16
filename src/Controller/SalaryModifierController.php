@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Service\ErpNextService;
 use App\Service\MonthlyPercentageService;
+use App\Service\ChangeHistoryService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,6 +35,9 @@ class SalaryModifierController extends AbstractController
     
     /** @var LoggerInterface Logger pour tracer les opérations */
     private $logger;
+    
+    /** @var ChangeHistoryService Service pour l'historique des modifications */
+    private $changeHistoryService;
 
     /**
      * Constructeur - Injection des dépendances
@@ -41,15 +45,18 @@ class SalaryModifierController extends AbstractController
      * @param ErpNextService $erpNextService Service ERPNext
      * @param MonthlyPercentageService $monthlyPercentageService Service des pourcentages
      * @param LoggerInterface $logger Logger Symfony
+     * @param ChangeHistoryService $changeHistoryService Service pour l'historique
      */
     public function __construct(
         ErpNextService $erpNextService, 
         MonthlyPercentageService $monthlyPercentageService,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        ChangeHistoryService $changeHistoryService
     ) {
         $this->erpNextService = $erpNextService;
         $this->monthlyPercentageService = $monthlyPercentageService;
         $this->logger = $logger;
+        $this->changeHistoryService = $changeHistoryService;
     }
 
     /**
@@ -125,8 +132,30 @@ class SalaryModifierController extends AbstractController
                 
                 // === SAUVEGARDE DES POURCENTAGES MENSUELS ===
                 if ($useMonthlyPercentages) {
+                    // Récupérer les anciens pourcentages pour l'historique
+                    $oldPercentages = $this->monthlyPercentageService->getMonthlyPercentages($component);
+                    
                     // Sauvegarder les pourcentages en base de données pour réutilisation future
                     $this->monthlyPercentageService->saveMonthlyPercentages($component, $monthlyPercentages);
+                    
+                    // Enregistrer l'historique des modifications de pourcentages
+                    for ($month = 1; $month <= 12; $month++) {
+                        $newPercentage = null;
+                        if (isset($monthlyPercentages[$month]) && $monthlyPercentages[$month] !== '') {
+                            $newPercentage = (float) $monthlyPercentages[$month];
+                        }
+                        
+                        $oldPercentage = $oldPercentages[$month] ?? null;
+                        if ($oldPercentage !== $newPercentage) {
+                            $this->changeHistoryService->logMonthlyPercentageChange(
+                                $component,
+                                $month,
+                                $oldPercentage,
+                                $newPercentage,
+                                "Modification des pourcentages mensuels via l'interface web"
+                            );
+                        }
+                    }
                 }
                 
                 // === CONVERSION DES TYPES ===
@@ -274,6 +303,19 @@ class SalaryModifierController extends AbstractController
                                         $slip['earnings'][$index]['amount'] = $finalValue;
                                         $modified = true;
                                         
+                                        // Enregistrer la modification dans l'historique
+                                        $reason = $useMonthlyPercentages 
+                                            ? "Modification par pourcentage mensuel (mois {$slipMonth})"
+                                            : "Modification par condition ({$condition} {$conditionValue})";
+                                        
+                                        $this->changeHistoryService->logPayslipChange(
+                                            $slip['name'],
+                                            $component,
+                                            $currentValue,
+                                            $finalValue,
+                                            $reason
+                                        );
+                                        
                                         $this->logger->info("Modified earning component", [
                                             'slip' => $slip['name'],
                                             'component' => $component,
@@ -324,6 +366,19 @@ class SalaryModifierController extends AbstractController
                                         // Supprimer l'ancienne valeur et entrer la nouvelle
                                         $slip['deductions'][$index]['amount'] = $finalValue;
                                         $modified = true;
+                                        
+                                        // Enregistrer la modification dans l'historique
+                                        $reason = $useMonthlyPercentages 
+                                            ? "Modification par pourcentage mensuel (mois {$slipMonth})"
+                                            : "Modification par condition ({$condition} {$conditionValue})";
+                                        
+                                        $this->changeHistoryService->logPayslipChange(
+                                            $slip['name'],
+                                            $component,
+                                            $currentValue,
+                                            $finalValue,
+                                            $reason
+                                        );
                                         
                                         $this->logger->info("Modified deduction component", [
                                             'slip' => $slip['name'],

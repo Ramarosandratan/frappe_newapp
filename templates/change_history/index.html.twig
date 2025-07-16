@@ -1,0 +1,250 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Historique des modifications{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-history"></i> Historique des modifications</h1>
+        <div>
+            <a href="{{ path('app_change_history_statistics') }}" class="btn btn-info">
+                <i class="fas fa-chart-bar"></i> Statistiques
+            </a>
+            <a href="{{ path('app_change_history_export', app.request.query.all) }}" class="btn btn-success">
+                <i class="fas fa-download"></i> Exporter CSV
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-filter"></i> Filtres</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label for="entity_type" class="form-label">Type d'entité</label>
+                    <select class="form-select" id="entity_type" name="entity_type">
+                        <option value="">Tous les types</option>
+                        <option value="Salary Slip" {{ (filters.entityType ?? '') == 'Salary Slip' ? 'selected' : '' }}>Fiche de paie</option>
+                        <option value="Employee" {{ (filters.entityType ?? '') == 'Employee' ? 'selected' : '' }}>Employé</option>
+                        <option value="Monthly Percentage" {{ (filters.entityType ?? '') == 'Monthly Percentage' ? 'selected' : '' }}>Pourcentage mensuel</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="entity_id" class="form-label">ID Entité</label>
+                    <input type="text" class="form-control" id="entity_id" name="entity_id" 
+                           value="{{ filters.entityId ?? '' }}" placeholder="Ex: HR-EMP-00001">
+                </div>
+                <div class="col-md-3">
+                    <label for="action" class="form-label">Action</label>
+                    <select class="form-select" id="action" name="action">
+                        <option value="">Toutes les actions</option>
+                        <option value="CREATE" {{ (filters.action ?? '') == 'CREATE' ? 'selected' : '' }}>Création</option>
+                        <option value="UPDATE" {{ (filters.action ?? '') == 'UPDATE' ? 'selected' : '' }}>Modification</option>
+                        <option value="DELETE" {{ (filters.action ?? '') == 'DELETE' ? 'selected' : '' }}>Suppression</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="field_name" class="form-label">Champ</label>
+                    <input type="text" class="form-control" id="field_name" name="field_name" 
+                           value="{{ filters.fieldName ?? '' }}" placeholder="Ex: base_salary">
+                </div>
+                <div class="col-md-3">
+                    <label for="start_date" class="form-label">Date de début</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" 
+                           value="{{ filters.startDate ? filters.startDate|date('Y-m-d') : '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="end_date" class="form-label">Date de fin</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                           value="{{ filters.endDate ? filters.endDate|date('Y-m-d') : '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="limit" class="form-label">Limite</label>
+                    <select class="form-select" id="limit" name="limit">
+                        <option value="50" {{ limit == 50 ? 'selected' : '' }}>50</option>
+                        <option value="100" {{ limit == 100 ? 'selected' : '' }}>100</option>
+                        <option value="200" {{ limit == 200 ? 'selected' : '' }}>200</option>
+                        <option value="500" {{ limit == 500 ? 'selected' : '' }}>500</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="fas fa-search"></i> Filtrer
+                    </button>
+                    <a href="{{ path('app_change_history_index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i> Réinitialiser
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistiques rapides -->
+    {% if statistics %}
+    <div class="row mb-4">
+        {% set totalChanges = 0 %}
+        {% for entityType, actions in statistics %}
+            {% for action, count in actions %}
+                {% set totalChanges = totalChanges + count %}
+            {% endfor %}
+        {% endfor %}
+        
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4>{{ totalChanges }}</h4>
+                            <p class="mb-0">Total modifications</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-edit fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% for entityType, actions in statistics %}
+            {% if loop.index <= 3 %}
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                {% set entityTotal = 0 %}
+                                {% for action, count in actions %}
+                                    {% set entityTotal = entityTotal + count %}
+                                {% endfor %}
+                                <h4>{{ entityTotal }}</h4>
+                                <p class="mb-0">{{ entityType }}</p>
+                            </div>
+                            <div class="align-self-center">
+                                <i class="fas fa-{{ entityType == 'Salary Slip' ? 'file-invoice-dollar' : (entityType == 'Employee' ? 'user' : 'percentage') }} fa-2x"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Résultats -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i> Historique 
+                <span class="badge bg-secondary">{{ total_results }} résultat(s)</span>
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            {% if history %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Date/Heure</th>
+                                <th>Type</th>
+                                <th>Entité</th>
+                                <th>Champ</th>
+                                <th>Ancienne valeur</th>
+                                <th>Nouvelle valeur</th>
+                                <th>Action</th>
+                                <th>Utilisateur</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for change in history %}
+                            <tr>
+                                <td>
+                                    <small>{{ change.changedAt|date('d/m/Y H:i:s') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark">{{ change.entityType }}</span>
+                                </td>
+                                <td>
+                                    <code>{{ change.entityId }}</code>
+                                </td>
+                                <td>
+                                    <strong>{{ change.fieldName }}</strong>
+                                </td>
+                                <td>
+                                    {% if change.oldValue %}
+                                        <span class="text-muted">{{ change.formattedOldValue }}</span>
+                                    {% else %}
+                                        <em class="text-muted">N/A</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if change.newValue %}
+                                        <span class="text-success">{{ change.formattedNewValue }}</span>
+                                    {% else %}
+                                        <em class="text-muted">N/A</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge {{ change.actionBadgeClass }}">
+                                        {{ change.actionLabel }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if change.userName %}
+                                        <small>{{ change.userName }}</small>
+                                    {% else %}
+                                        <em class="text-muted">Système</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ path('app_change_history_entity', {entityType: change.entityType, entityId: change.entityId|url_encode}) }}" 
+                                           class="btn btn-outline-primary btn-sm" title="Voir l'historique de cette entité">
+                                            <i class="fas fa-history"></i>
+                                        </a>
+                                        {% if change.reason %}
+                                        <button type="button" class="btn btn-outline-info btn-sm" 
+                                                data-bs-toggle="tooltip" title="{{ change.reason }}">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Aucune modification trouvée</h5>
+                    <p class="text-muted">Essayez de modifier les filtres pour élargir votre recherche.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if total_results >= limit %}
+    <div class="alert alert-info mt-3">
+        <i class="fas fa-info-circle"></i>
+        Seuls les {{ limit }} premiers résultats sont affichés. 
+        Utilisez les filtres pour affiner votre recherche ou augmentez la limite.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser les tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

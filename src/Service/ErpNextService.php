@@ -1176,12 +1176,25 @@ class ErpNextService
     public function updateSalarySlipAmounts(string $salarySlipName, float $baseAmount): array
     {
         try {
+            $this->logger->info("Starting salary slip update", [
+                'slip_name' => $salarySlipName,
+                'base_amount' => $baseAmount
+            ]);
+            
             // Récupérer la fiche de paie complète
             $salarySlip = $this->getResource('Salary Slip', $salarySlipName);
             
             if (!$salarySlip) {
+                $this->logger->error("Salary slip not found", ['slip_name' => $salarySlipName]);
                 throw new \RuntimeException("Salary slip not found: $salarySlipName");
             }
+            
+            $this->logger->debug("Retrieved salary slip", [
+                'slip_name' => $salarySlipName,
+                'employee' => $salarySlip['employee'] ?? 'unknown',
+                'current_earnings_count' => isset($salarySlip['earnings']) ? count($salarySlip['earnings']) : 0,
+                'current_deductions_count' => isset($salarySlip['deductions']) ? count($salarySlip['deductions']) : 0
+            ]);
             
             $this->logger->info("Updating salary slip amounts", [
                 'slip' => $salarySlipName,
@@ -1305,8 +1318,20 @@ class ErpNextService
             ]);
             
             // Sauvegarder la fiche de paie mise à jour
+            $this->logger->info("Saving updated salary slip", [
+                'slip_name' => $salarySlipName,
+                'final_total_earning' => $salarySlip['total_earning'],
+                'final_total_deduction' => $salarySlip['total_deduction'],
+                'final_net_pay' => $salarySlip['net_pay']
+            ]);
+            
             $result = $this->request('POST', '/api/method/frappe.client.save', [
                 'json' => ['doc' => $salarySlip]
+            ]);
+            
+            $this->logger->info("Salary slip saved successfully", [
+                'slip_name' => $salarySlipName,
+                'result' => is_array($result) ? array_keys($result) : 'non-array result'
             ]);
             
             return $result;
